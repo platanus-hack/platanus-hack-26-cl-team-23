@@ -10,6 +10,11 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "httpx>=0.28.0",
     "granian[reload]>=2.8.8",
+    "trackers>=2.7.0",
+    "inference-sdk>=1.8",
+    "supervision>=0.32",
+    "opencv-python-headless>=4.8",
+    "numpy>=2.0",
 ]
 
 [dependency-groups]

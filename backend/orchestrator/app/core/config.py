@@ -61,6 +61,13 @@ class Settings:
         # HTTP client
         self.http_timeout: float = _require_float("HTTP_TIMEOUT")
 
+        # Roboflow (opcionales: solo se exigen al procesar video, no al arrancar)
+        self.roboflow_api_key: str = os.getenv("ROBOFLOW_API_KEY", "").strip()
+        self.roboflow_api_url: str = os.getenv(
+            "ROBOFLOW_API_URL", "https://serverless.roboflow.com"
+        ).strip()
+        self.roboflow_model_id: str = os.getenv("ROBOFLOW_MODEL_ID", "rfdetr-medium").strip()
+
     @property
     def is_local(self) -> bool:
         return self.app_env.lower() == "local"
