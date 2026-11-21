@@ -9,7 +9,6 @@ dependencies = [
     "pydantic>=2.9.0",
     "python-dotenv>=1.0.1",
     "httpx>=0.28.0",
-    "granian[reload]>=2.8.8",
     "trackers>=2.7.0",
     "inference-sdk>=1.8",
     "supervision>=0.32",
@@ -21,6 +20,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "granian[reload]>=2.8.8",
     "pytest>=8.3.0",
     "httpx>=0.28.0",
     "poethepoet>=0.34.0",
@@ -43,4 +43,10 @@ target-version = "py313"
 
 [tool.uv]
 # `trackers` pide opencv-python (con GUI/libGL); en serverless solo sirve la variante headless.
-override-dependencies = ["opencv-python; sys_platform == 'never'"]
+# `av` y `matplotlib` los pide `supervision` pero no se usan (solo Detections); pesan ~100 MB
+# y el bundle de Vercel no puede superar 500 MB.
+override-dependencies = [
+    "opencv-python; sys_platform == 'never'",
+    "av; sys_platform == 'never'",
+    "matplotlib; sys_platform == 'never'",
+]
