@@ -11,6 +11,7 @@ from app.core.config import Settings, settings
 from app.core.domain_errors import AuthenticationError
 from app.cv.detector import RoboflowDetector
 from app.services.tracking_service import TrackingService
+from app.services.zones_service import ZonesService
 
 
 def get_settings() -> Settings:
@@ -44,6 +45,10 @@ def get_tracking_service(
     detector_provider: Annotated[Callable[[], RoboflowDetector], Depends(get_detector_provider)],
 ) -> TrackingService:
     return TrackingService(storage, detector_provider)
+
+
+def get_zones_service() -> ZonesService:
+    return ZonesService()
 
 
 def require_demo_key(x_demo_key: Annotated[str | None, Header()] = None) -> None:

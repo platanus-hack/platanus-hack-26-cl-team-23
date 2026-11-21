@@ -43,6 +43,21 @@ El archivo `.env` se carga automáticamente al iniciar la app (`app/core/config.
 | `GET /presets/{name}` | Resultado precomputado de un video de ejemplo (`NCCA`) |
 | `GET /results/{key}` | Resultado guardado por `/process` |
 
+### Zonas (`/api/zones`)
+
+Dice en qué zona de la pista (Z1..Z6) enfoca la cámara en cada frame, para videos de TV donde no
+hay calibración fija. Mismo patrón que detect → track (sin estado):
+
+| Ruta | Para qué |
+|---|---|
+| `POST /zones/features` | Lote de frames (multipart: `frames` JPEG, `t`; máx. 24) → por frame `hist` (cortes de plano), `desc` (apariencia), `bend/chord/n` (curvatura de líneas) |
+| `POST /zones/` | JSON `{distance, t0, frames:[{t, hist, desc?, bend?, chord?, n?}]}` → por frame `zone`, `p[6]`, `s`, `x`, `cut`, ... (`frame` = posición en la lista, igual que `/track`) |
+
+`t0` es el segundo del video en que suena el disparo; `distance`, los metros de la prueba (define
+dónde parte y el ritmo plausible). La zona sale sobre todo del reloj de carrera: si `t0` está mal,
+la zona estará mal. Calibrado solo con la final 1500 m NCAA 2025 (≈86 % de exactitud); la memoria
+de cámaras necesita >40 s de video. Detalle en `research/trazada/README.md`.
+
 `/detect` y `/process` gastan créditos de Roboflow: si `DEMO_ACCESS_KEY` está definida exigen el
 header `X-Demo-Key`. Las variables `ROBOFLOW_*`, `BLOB_*` y `STORAGE_BACKEND` son opcionales al
 arrancar (ver `.env.example`).
