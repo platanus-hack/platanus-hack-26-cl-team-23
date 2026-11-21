@@ -45,3 +45,5 @@ deploy: ## Deploy a producción en Vercel
 docs: ## Regenerar los diagramas D2 del README (requiere d2)
 	d2 docs/flow.d2 docs/assets/flow.svg
 	d2 docs/infra.d2 docs/assets/infra.svg
+	d2 docs/tech.d2 docs/assets/tech.svg
+	d2 docs/coords.d2 docs/assets/coords.svg

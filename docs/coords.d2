@@ -1,0 +1,32 @@
+vars: {
+  d2-config: {
+    layout-engine: dagre
+    theme-id: 0
+    pad: 40
+  }
+}
+
+direction: down
+
+classes: {
+  space: {style: {border-radius: 12; stroke-width: 2; fill: "#EEF3FF"; stroke: "#3B5BDB"; font-size: 14}}
+  out: {style: {border-radius: 12; stroke-width: 2; fill: "#E8F5E9"; stroke: "#2E7D32"; font-size: 14}}
+}
+
+a: "Píxeles del video original\n(x, y) · cajas de detección" {class: space}
+b: "Píxeles del JPEG ≤960 px\nescala sx, sy = JPEG / original" {class: space}
+c: "Píxeles de trabajo\n1280 px de ancho\n(umbrales calibrados aquí)" {class: space}
+d: "Metros locales del plano\nΔs relativo al grupo\nd al bordillo" {class: space}
+e: "x · metros desde la salida\n= x del grupo + Δs\n(sin envolver)" {class: space}
+f: "s ∈ [0, 400)\ns = (salida + x) mod 400\nzona Z1..Z6 · calle" {class: space}
+g: "Vista cenital (X, Y) en metros\ntrackToWorld(s, d)\nradio 36,5 m · recta 84,39 m" {class: out}
+
+a -> b: "÷ sx, sy"
+b -> c: "reescala"
+c -> d: "perspectiva débil\npx/m = a + b·fila\ncalle = 1,22 m · cuerpo = 1,75 m"
+d -> e: "ancla del grupo\n(filtro de zonas)"
+e -> f: "geometría World Athletics\nsalida = −distancia mod 400"
+f -> g: "arco en curvas,\nlínea recta en rectas"
+
+extra: "Metros extra en curva" {class: out}
+f -> extra: "Σ dx · (d − 0,3) / (R + 0,3)"
