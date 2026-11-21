@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install dev test lint fmt types reqs vercel-dev deploy
+.PHONY: help install dev test lint fmt types reqs vercel-dev deploy docs
 
 help: ## Mostrar comandos disponibles
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -41,3 +41,7 @@ vercel-dev: ## Correr todo con Vercel Services en local
 
 deploy: ## Deploy a producción en Vercel
 	vercel --prod
+
+docs: ## Regenerar los diagramas D2 del README (requiere d2)
+	d2 docs/flow.d2 docs/assets/flow.svg
+	d2 docs/infra.d2 docs/assets/infra.svg
