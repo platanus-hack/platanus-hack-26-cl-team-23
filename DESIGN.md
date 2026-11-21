@@ -142,3 +142,55 @@ La curva de una pista vista desde arriba: tres carriles concéntricos en forma d
 ## 8. Voz
 
 Español chileno, directo y deportivo. Frases cortas. Primero el valor, después lo técnico. Las cifras siempre con unidad y coma decimal (`0,41 m`, `20,7 s`). Las afirmaciones van con su fuente (por ejemplo *González-Mohíno et al., 2021*).
+
+---
+
+## 9. Overlays sobre video
+
+Lo que dibujamos encima del video de la carrera (cajas, estelas, paneles) sigue las mismas reglas que la app. El video ya trae mucho color y gráficos de la transmisión; nosotros sumamos **lo mínimo, en blanco y un solo naranja**.
+
+Código: `backend/orchestrator/app/cv/theme.py` (OpenCV + Pillow). Muestra: `python -m app.cv.demo_theme --video NCCA.mp4 --tracks NCCA.tracks.json --out despues.png`.
+
+### Qué se dibuja y cómo
+
+| Pieza | Función | Estilo |
+|---|---|---|
+| Caja del corredor | `corners()` | Cuatro esquinas finas, no un rectángulo cerrado (tapa menos). Blanco 80 %, 2 px. El elegido: naranja `#FF5B14`, 3 px. |
+| Etiqueta | `pill()` | Píldora blanca con número en tinta (Geist Mono). El elegido: píldora naranja con texto en tinta, `#7`. **Nunca texto blanco sobre naranja.** |
+| Estela de los pies | `trail()` | Elegido: naranja 4 px, uniones redondeadas. Resto: blanco 50 %, 2 px. La cola se desvanece. |
+| Panel de datos | `glass_panel()` | Vidrio esmerilado: desenfoque del video + blanco 72 %, radio 22 px. **Nunca paneles negros opacos.** Texto en tinta. |
+| Texto | `text()` | Inter / Geist Mono reales con antialias. **Nunca fuentes Hershey de OpenCV.** Rótulos en mono MAYÚSCULAS; unidades siempre en minúscula (`m`, `s`). |
+| Vista cenital | `oval()` | Igual que la app: carriles grises alternados `#E8E8ED` / `#DEDEE3`, líneas blancas, zona actual en tinta, incertidumbre como tramo `#FFD8C4` y el punto naranja. |
+
+Color: un corredor elegido en naranja, todos los demás en blanco. Nada de un color por atleta ni un color por zona (paleta arcoíris): no se lee y compite con las camisetas. Verde `#1A7F37` y rojo `#D70015` solo si el dato es ganó / perdió puestos. Como el color no basta para distinguir corredores, cada uno lleva su número.
+
+### Tamaños: por alto del video
+
+Todo se diseña a 1080p y se escala con `Scale(alto)`: `sc.px(22)` mide 22 px en 1080p, 15 px en 720p y 44 px en 4K. Así un render en 720p se ve igual que en 1080p.
+
+| Rol | 1080p | Fuente |
+|---|---|---|
+| Rótulo | 22 px (mínimo legible) | Geist Mono 500, +0,08 em |
+| Texto | 26 px | Inter 400 |
+| Título de panel | 36 px | Inter 600 |
+| Cifra | 56 px | Inter Display 700, números tabulares |
+
+Ningún texto bajo 22 px a 1080p: el video se mira en celular o proyectado.
+
+### Zona segura
+
+Las transmisiones ponen arriba el logo y el nombre del evento, y abajo el reloj de carrera, los zócalos y el ticker. `safe_rect()` deja libre 8 % arriba, 22 % abajo y 4 % a los lados; los paneles van **dentro** de esa zona (por defecto, abajo a la derecha, justo encima del reloj). Si un video trae gráficos en otro lado, se ajustan los márgenes, no se tapan.
+
+### Movimiento
+
+- **Fundidos cortos:** todo aparece y desaparece en 200 ms (`fade()`), nada salta de golpe. Cuando hay un corte de cámara, las cajas y estelas se borran y vuelven con fundido.
+- **Suavizado causal:** `Smoother` suaviza cajas, estelas y cifras usando solo lo que ya pasó (sirve en vivo). Quita el temblor sin "adivinar" el futuro.
+- **Cifras que no bailan:** los números van con ancho tabular (`tabular=True`) para que `312 m` → `313 m` no mueva el texto.
+
+### Para migrar un script
+
+1. `from app.cv import theme as th` y `sc = th.Scale(frame.shape[0])` una vez por video.
+2. Reemplazar `cv2.rectangle` de cajas por `th.corners(...)`, `cv2.putText` por `th.text(...)` o `th.pill(...)`, `cv2.polylines` de estelas por `th.trail(...)`.
+3. Reemplazar paneles negros (`np.zeros` + `addWeighted`) por `th.glass_panel(...)` y escribir encima con `th.text(...)`.
+4. Borrar las paletas por id (`id_color`, `_color`, `COLS`): el elegido es naranja y el resto blanco.
+5. Cifras con `th.fmt_num()`: coma decimal, punto de miles, unidad en minúscula (`+3,2 m`, `1.188 m`).
