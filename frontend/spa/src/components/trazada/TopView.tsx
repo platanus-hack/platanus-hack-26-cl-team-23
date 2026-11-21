@@ -8,6 +8,7 @@ import { useCanvas } from '../../trazada/useCanvas'
 type Props = {
   race: Race
   frameIndex: number
+  selectedId?: number
 }
 
 const BAND = LANES * LANE
@@ -16,10 +17,10 @@ const HALF_H = R + BAND
 
 /**
  * Pista de 400 m vista desde arriba, a escala. Marca el tramo que recorrió el encuadre y
- * dónde está mirando la cámara ahora. Todo eso sale de /api/zones/: no hay posiciones de
- * corredores porque el backend todavía no las calcula.
+ * dónde está mirando la cámara ahora (/api/zones/) y, si hay datos de atletas, un punto por
+ * corredor en su posición (s, d) (/api/athletes/). El elegido va en naranja; el resto, en gris.
  */
-export function TopView({ race, frameIndex }: Props) {
+export function TopView({ race, frameIndex, selectedId }: Props) {
   const { ref, size } = useCanvas()
   const frame = race.frames[frameIndex]
 
@@ -104,7 +105,32 @@ export function TopView({ race, frameIndex }: Props) {
       ctx.stroke()
       ctx.restore()
     }
-  }, [race, frame, size, ref])
+
+    // Atletas: la posición medida es sólida; la predicha (no se les ve ahora) va tenue.
+    const athletes = frame?.athletes ?? []
+    const dots = [...athletes].sort((a, b) => Number(a.id === selectedId) - Number(b.id === selectedId))
+    for (const a of dots) {
+      const isSel = a.id === selectedId
+      const [x, y] = at(a.s, Math.max(0.3, Math.min(BAND - 0.3, a.d)))
+      ctx.save()
+      ctx.globalAlpha = a.visible ? 1 : 0.35
+      ctx.fillStyle = isSel ? themeColor('pick') : themeColor('other')
+      ctx.beginPath()
+      ctx.arc(x, y, isSel ? 6 : 4, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = themeColor('surface')
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+      if (isSel) {
+        ctx.font = `600 11px ${mono}`
+        ctx.fillStyle = themeColor('fg')
+        ctx.textAlign = 'center'
+        ctx.fillText(`#${a.id}`, x, y - 11)
+        ctx.textAlign = 'start'
+      }
+      ctx.restore()
+    }
+  }, [race, frame, size, ref, selectedId])
 
   return (
     <div className="relative aspect-[16/9] w-full overflow-hidden">
@@ -112,7 +138,7 @@ export function TopView({ race, frameIndex }: Props) {
         ref={ref}
         className="absolute inset-0 h-full w-full"
         role="img"
-        aria-label="Vista cenital de la pista de 400 m con el tramo que enfoca la cámara"
+        aria-label="Vista cenital de la pista de 400 m con el tramo que enfoca la cámara y la posición de cada atleta"
       />
     </div>
   )

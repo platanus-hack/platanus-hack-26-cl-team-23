@@ -51,7 +51,7 @@ export function CameraView({ race, frameIndex, t, playing, showOverlay, selected
     // Cajas: solo las esquinas, para no tapar al corredor.
     for (const r of visible) {
       const [x1, y1, x2, y2] = r.bbox.map((n) => n * k)
-      const isSel = r.id === selectedId
+      const isSel = r.rid !== undefined && r.rid === selectedId
       const c = Math.min(10, (x2 - x1) / 3)
       ctx.strokeStyle = isSel ? pick : 'rgba(255,255,255,.6)'
       ctx.lineWidth = isSel ? 2 : 1.2
@@ -74,15 +74,18 @@ export function CameraView({ race, frameIndex, t, playing, showOverlay, selected
     // Etiqueta con el id del corredor. El elegido va primero para que quede en su lugar;
     // si dos etiquetas chocan, la siguiente sube un escalón.
     const placed: { x: number; y: number }[] = []
-    const labeled = [...visible].sort((a, b) => Number(b.id === selectedId) - Number(a.id === selectedId))
+    // Sin atleta asignado (plano sin medición) la caja se dibuja, pero sin etiqueta.
+    const labeled = visible
+      .filter((r) => r.rid !== undefined)
+      .sort((a, b) => Number(b.rid === selectedId) - Number(a.rid === selectedId))
     for (const r of labeled) {
-      const isSel = r.id === selectedId
+      const isSel = r.rid === selectedId
       const cx = ((r.bbox[0] + r.bbox[2]) / 2) * k
       let y = r.bbox[1] * k - 14
       while (placed.some((p) => Math.abs(p.x - cx) < 44 && Math.abs(p.y - y) < 22)) y -= 22
       placed.push({ x: cx, y })
       // Elegido: bloque naranja con tinta (5,6:1). Resto: etiqueta blanca con tinta.
-      pill(ctx, info.get(r.id)?.label ?? `#${r.id}`, cx, y, {
+      pill(ctx, info.get(r.rid!)?.label ?? `#${r.id}`, cx, y, {
         font: `${isSel ? 600 : 500} ${isSel ? 13 : 11}px ${mono}`,
         color: themeColor('fg'),
         bg: isSel ? pick : themeColor('surface'),
@@ -103,11 +106,11 @@ export function CameraView({ race, frameIndex, t, playing, showOverlay, selected
         const [x1, y1, x2, y2] = r.bbox
         const inside = x >= x1 - pad && x <= x2 + pad && y >= y1 - pad && y <= y2 + pad
         const dist = Math.hypot(x - (x1 + x2) / 2, y - (y1 + y2) / 2)
-        return { id: r.id, inside, dist }
+        return { id: r.rid, inside, dist }
       })
-      .filter((h) => h.inside)
+      .filter((h) => h.inside && h.id !== undefined)
       .sort((a, b) => a.dist - b.dist)[0]
-    if (hit) onSelect(hit.id)
+    if (hit?.id !== undefined) onSelect(hit.id)
   }
 
   return (

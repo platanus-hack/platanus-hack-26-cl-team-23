@@ -111,8 +111,12 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
 
       <div className="grid gap-[var(--section-gap)] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         {race.camera && (
-          <Figure title="Dónde mira la cámara" flush meta="Pista de 400 m a escala">
-            <TopView race={race} frameIndex={fi} />
+          <Figure
+            title={race.hasAthletes ? 'Dónde está cada atleta' : 'Dónde mira la cámara'}
+            flush
+            meta="Pista de 400 m a escala"
+          >
+            <TopView race={race} frameIndex={fi} selectedId={selectedId} />
             <dl className="grid grid-cols-3 gap-2 px-6 pt-2 pb-6">
               <Stat term="Tramo enfocado" value={`${fmtNum(race.camera.span[0], 0)}–${fmtNum(race.camera.span[1], 0)} m`} />
               <Stat term="Cambios de plano" value={`${race.camera.cuts.length}`} />
@@ -122,8 +126,8 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
         )}
 
         {selected && (
-          <Figure title="Ficha del corredor" meta={`Corredor ${selected.label}`}>
-            <RunnerStats race={race} selectedId={selected.id} />
+          <Figure title="Ficha del corredor" meta={`${race.hasAthletes ? 'Atleta' : 'Corredor'} ${selected.label}`}>
+            <RunnerStats race={race} selectedId={selected.id} frameIndex={fi} />
           </Figure>
         )}
       </div>

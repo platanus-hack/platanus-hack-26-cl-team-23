@@ -2,14 +2,22 @@
 //
 // Flujo: revisar duración → sacar cuadros → mandarlos al backend en lotes
 // (POST /api/tracking/detect, y de paso POST /api/zones/features con los MISMOS cuadros)
-// → una sola llamada a POST /api/tracking/track que devuelve el seguimiento con ids.
+// → una sola llamada a POST /api/tracking/track que devuelve el seguimiento con ids
+// → con esos ids y las zonas, POST /api/athletes/features (mismos cuadros, en lotes seguidos)
+//   y POST /api/athletes/: posición y velocidad de cada atleta.
 // El video nunca se sube: solo viajan los cuadros, ya reescalados.
 //
 // Se procesa ANTES de reproducir, para que en el escenario se vea fluido; igual es
 // causal, cada cuadro solo usa los anteriores.
 
 import { ApiError, apiPost, apiUpload } from '../lib/api'
-import type { DetectResponse, TrackingResult, ZonesResult } from './types'
+import {
+  ATHLETE_BATCH,
+  type AthleteOptions,
+  measureAthletes,
+  resolveAthletes,
+} from './athletes'
+import type { AthletesResult, DetectResponse, TrackingResult, ZonesResult } from './types'
 import { type ZoneOptions, collectZoneFeatures, resolveZones } from './zones'
 
 /** Tope para la demo: una curva de 115 m a ritmo de medio fondo son ~16 s. */
@@ -94,23 +102,25 @@ function encode(canvas: HTMLCanvasElement, quality: number): Blob {
   return new Blob([bytes], { type: head.slice(5, head.indexOf(';')) })
 }
 
-export type Phase = 'extracting' | 'detecting' | 'tracking'
+export type Phase = 'extracting' | 'detecting' | 'tracking' | 'measuring'
 export type Progress = { phase: Phase; done: number; total: number }
 
 export type ProcessOptions = {
   signal?: AbortSignal
   /** Zonas de la pista: si se omite, no se llama al módulo de zonas. */
   zones?: ZoneOptions
+  /** Posición y velocidad por atleta. Necesita las zonas; si se omite, no se calculan. */
+  athletes?: AthleteOptions
 }
 
-export type ProcessResult = { tracks: TrackingResult; zones?: ZonesResult }
+export type ProcessResult = { tracks: TrackingResult; zones?: ZonesResult; athletes?: AthletesResult }
 
 /** Procesa todo el video contra el backend y devuelve el seguimiento con ids. */
 export async function processVideo(
   src: string,
   info: VideoInfo,
   onProgress: (p: Progress) => void,
-  { signal, zones }: ProcessOptions = {},
+  { signal, zones, athletes }: ProcessOptions = {},
 ): Promise<ProcessResult> {
   const total = Math.floor(info.duration * SAMPLE_FPS)
   if (total < 2) throw new UploadError('El video es demasiado corto para analizarlo.')
@@ -167,7 +177,42 @@ export async function processVideo(
       : undefined
 
   onProgress({ phase: 'tracking', done: 1, total: 1 })
-  return { tracks, zones: zoneResult }
+
+  // 4) Atletas: es un extra, igual que las zonas. Si algo falla se muestra lo demás.
+  const athleteResult =
+    athletes && zoneResult && zoneResult.frames.length === frames.length
+      ? await measure(frames, tracks, zoneResult, athletes, onProgress, signal).catch(() => undefined)
+      : undefined
+
+  return { tracks, zones: zoneResult, athletes: athleteResult }
+}
+
+/** Mide a cada atleta: lotes de cuadros seguidos en paralelo, y un filtro final con el grupo. */
+async function measure(
+  frames: Frame[],
+  tracks: TrackingResult,
+  zones: ZonesResult,
+  options: AthleteOptions,
+  onProgress: (p: Progress) => void,
+  signal?: AbortSignal,
+): Promise<AthletesResult> {
+  const batches: Frame[][] = []
+  for (let i = 0; i < frames.length; i += ATHLETE_BATCH) batches.push(frames.slice(i, i + ATHLETE_BATCH))
+
+  let done = 0
+  onProgress({ phase: 'measuring', done, total: frames.length })
+  const results = await pool(batches, CONCURRENCY, async (batch) => {
+    const measured = await retry(() => measureAthletes(batch, tracks, signal))
+    done += batch.length
+    onProgress({ phase: 'measuring', done, total: frames.length })
+    return measured
+  })
+  return resolveAthletes(
+    results.flatMap((r) => r.frames),
+    zones,
+    options,
+    signal,
+  )
 }
 
 function detectBatch(batch: Frame[], info: VideoInfo, signal?: AbortSignal): Promise<DetectResponse> {

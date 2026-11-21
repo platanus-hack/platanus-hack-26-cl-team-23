@@ -10,6 +10,7 @@ import {
   processVideo,
   type Progress,
 } from '../../trazada/upload'
+import { DEFAULT_ATHLETE_OPTIONS } from '../../trazada/athletes'
 import { DEFAULT_ZONE_OPTIONS } from '../../trazada/zones'
 import { ApiError } from '../../lib/api'
 import { Button, Figure, TrackMark } from './ui'
@@ -28,13 +29,15 @@ const PHASE_LABEL: Record<Progress['phase'], string> = {
   extracting: 'sacando cuadros del video',
   detecting: 'buscando corredores',
   tracking: 'siguiendo a cada corredor',
+  measuring: 'midiendo posición y velocidad',
 }
 
-/** Las tres fases pesan distinto: detectar es lo lento (va contra el servidor). */
+/** Las fases pesan distinto: detectar es lo lento (va contra el servidor). */
 const PHASE_RANGE: Record<Progress['phase'], [number, number]> = {
-  extracting: [0, 0.35],
-  detecting: [0.35, 0.95],
-  tracking: [0.95, 1],
+  extracting: [0, 0.3],
+  detecting: [0.3, 0.75],
+  tracking: [0.75, 0.8],
+  measuring: [0.8, 1],
 }
 
 function progressPct(p: Progress) {
@@ -68,14 +71,14 @@ export function UploadPanel({ onReady }: Props) {
         )
       }
       setState({ kind: 'processing', name, src, progress: { phase: 'extracting', done: 0, total: 1 } })
-      const { tracks, zones } = await processVideo(
+      const { tracks, zones, athletes } = await processVideo(
         src,
         info,
         (progress) => setState({ kind: 'processing', name, src, progress }),
-        { signal: ctrl.signal, zones: DEFAULT_ZONE_OPTIONS },
+        { signal: ctrl.signal, zones: DEFAULT_ZONE_OPTIONS, athletes: DEFAULT_ATHLETE_OPTIONS },
       )
       onReady(
-        buildRace(tracks, zones, {
+        buildRace(tracks, zones, athletes, {
           title: name,
           videoUrl: src,
           note:
