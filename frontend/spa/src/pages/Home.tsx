@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CameraView } from '../components/trazada/CameraView'
+import { NarrationPanel } from '../components/trazada/NarrationPanel'
 import { RunnerList, RunnerStats } from '../components/trazada/RunnerList'
 import { UploadPanel } from '../components/trazada/UploadPanel'
 import { TopView } from '../components/trazada/TopView'
@@ -126,6 +127,9 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
           <RunnerList race={race} frameIndex={fi} selectedId={selectedId} onSelect={setSelectedId} />
         </aside>
       </div>
+
+      {/* key: al cambiar de video, el relato anterior se descarta sin efectos raros */}
+      <NarrationPanel key={race.video.url} race={race} t={t} playing={playing} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         {race.camera && (

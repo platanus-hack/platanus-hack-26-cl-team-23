@@ -166,10 +166,52 @@ Lo que todavía no existe es la geometría por corredor (metros sobre la pista, 
 cuerda, metros extra en la curva): hace falta la homografía por cuadro, que vive en
 `research/trazada` y aún no tiene endpoint. Hasta entonces no se dibuja nada de eso.
 
+## Relato de la carrera
+
+`POST /api/narration/` recibe lo que ya devolvieron `/tracking/track` y `/zones/` y devuelve
+el relato: texto por tramos, con la duración real de cada audio.
+
+```
+tracks + zones ─► hechos (cv/race_facts.py)  ← resumen determinista, sin IA
+                ─► guion (Claude)            ← tool use obligado: JSON garantizado
+                ─► validación                ← cifras, léxico y cobertura
+                ─► voz (ElevenLabs)          ← una petición por tramo
+```
+
+El guion **no puede inventar**. Antes de sintetizar nada se verifica que toda cifra exista en
+los hechos y que no se afirme nada que el sistema no mide (puestos, quién gana, tiempos). Si
+el guion no pasa, se reintenta una vez con el error a la vista; si vuelve a fallar, o si no
+hay claves configuradas, se usan plantillas deterministas. La demo nunca se queda muda.
+
+Sin posiciones por corredor el relato habla de lo que sí hay: cuántos atletas se siguen,
+cuántos caben en cuadro, cuándo aparece o se pierde uno, qué tramo enfoca la cámara y cuántos
+cambios de plano hay. El `disclaimer` de la respuesta dice explícitamente qué no mide.
+
+La voz va enganchada al play del video: cada tramo suena dentro de su ventana, se pausa con
+el video y salta con la línea de tiempo. Como el largo del texto no se puede pedir con
+precisión a un modelo, el backend mide la duración real de cada mp3 y, si algún tramo se pasa
+de su ventana, pide **un** recorte con esa cifra en la mano. Además el front acelera hasta
+1,35× para encajar el tramo, antes que cortar una frase a la mitad.
+
+Se usa `eleven_v4`, que habla más rápido que Multilingual v2 y por eso cabe mejor en clips
+cortos.
+
+El mismo video produce la misma clave de caché: repetir la demo no gasta cuota de Claude ni
+de ElevenLabs. `GET /api/narration/{key}/audio/{i}` sirve el mp3 de cada tramo.
+
 ## Variables de entorno
 
-El backend no tiene defaults: todas son requeridas (`APP_ENV`, `APP_HOST`,
-`APP_PORT`, `HTTP_TIMEOUT`). Ver `backend/orchestrator/.env.example`.
+El backend no tiene defaults para lo esencial: `APP_ENV`, `APP_HOST`, `APP_PORT` y
+`HTTP_TIMEOUT` son obligatorias. El resto es opcional y degrada con elegancia:
+
+| Variable | Si falta |
+|---|---|
+| `ROBOFLOW_API_KEY` | `/detect` y `/process` responden 502 |
+| `ANTHROPIC_API_KEY` | el relato se arma con plantillas |
+| `ELEVEN_LABS_API_KEY` | el relato vuelve solo como texto |
+| credenciales de Blob | el almacenamiento cae a disco local |
+
+Ver `backend/orchestrator/.env.example`.
 
 ## Deploy en Vercel
 

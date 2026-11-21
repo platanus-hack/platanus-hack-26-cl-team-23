@@ -26,6 +26,96 @@
         }
       }
     },
+    "/api/narration/": {
+      "post": {
+        "tags": [
+          "narration"
+        ],
+        "summary": "Narrate",
+        "description": "Relato del clip: hechos \u2192 guion \u2192 voz. Repetir el mismo video sale de cach\u00e9.",
+        "operationId": "narrate_api_narration__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NarrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NarrationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/narration/{key}/audio/{index}": {
+      "get": {
+        "tags": [
+          "narration"
+        ],
+        "summary": "Audio",
+        "description": "Audio de un tramo del relato.",
+        "operationId": "audio_api_narration__key__audio__index__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "audio/mpeg": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tracking/detect": {
       "post": {
         "tags": [
@@ -511,6 +601,142 @@
           "version"
         ],
         "title": "HealthResponse"
+      },
+      "NarrationRequest": {
+        "properties": {
+          "tracks": {
+            "$ref": "#/components/schemas/TrackingResult",
+            "description": "Salida de /api/tracking/track"
+          },
+          "zones": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ZonesResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Salida de /api/zones/ (opcional: sin ella no hay relato de c\u00e1mara)"
+          },
+          "style": {
+            "type": "string",
+            "enum": [
+              "transmision",
+              "analisis"
+            ],
+            "title": "Style",
+            "description": "Registro del relato",
+            "default": "transmision"
+          },
+          "segment_s": {
+            "type": "number",
+            "maximum": 15.0,
+            "minimum": 2.0,
+            "title": "Segment S",
+            "description": "Duraci\u00f3n objetivo de cada tramo narrado",
+            "default": 8.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "tracks"
+        ],
+        "title": "NarrationRequest"
+      },
+      "NarrationResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "cached": {
+            "type": "boolean",
+            "title": "Cached"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "llm",
+              "template"
+            ],
+            "title": "Source",
+            "description": "De d\u00f3nde sali\u00f3 el guion"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer",
+            "description": "Qu\u00e9 NO mide el sistema; se muestra al pie"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/NarrationSegment"
+            },
+            "type": "array",
+            "title": "Segments"
+          },
+          "audio": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Audio",
+            "description": "URL de cada segmento: GET /api/narration/{key}/audio/{index}"
+          },
+          "characters": {
+            "type": "integer",
+            "title": "Characters",
+            "description": "Caracteres enviados a ElevenLabs (su unidad de cobro)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "cached",
+          "source",
+          "disclaimer",
+          "segments",
+          "audio",
+          "characters"
+        ],
+        "title": "NarrationResponse"
+      },
+      "NarrationSegment": {
+        "properties": {
+          "start": {
+            "type": "number",
+            "title": "Start",
+            "description": "Segundo del video en que empieza este tramo"
+          },
+          "end": {
+            "type": "number",
+            "title": "End",
+            "description": "Segundo del video en que termina"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S",
+            "description": "Duraci\u00f3n real del audio. Puede superar la ventana: entonces la voz termina despu\u00e9s del corte y el front encadena los tramos sin cortar palabras."
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "text"
+        ],
+        "title": "NarrationSegment"
       },
       "PipelineInfo": {
         "properties": {

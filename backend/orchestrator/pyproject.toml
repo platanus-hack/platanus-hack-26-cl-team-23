@@ -16,6 +16,8 @@ dependencies = [
     "numpy>=2.0",
     "vercel-blob>=0.5.0",
     "python-multipart>=0.0.34",
+    "anthropic>=0.40",
+    "elevenlabs>=2.0",
 ]
 
 [dependency-groups]

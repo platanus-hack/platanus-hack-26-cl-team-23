@@ -66,4 +66,6 @@ export type Race = {
   camera?: CameraRead
   /** Corredor preseleccionado: el que se siguió por más tiempo. */
   defaultId?: number
+  /** Respuestas originales de la API, para pedir el relato sin volver a procesar el video. */
+  raw: { tracks: TrackingResult; zones?: ZonesResult }
 }

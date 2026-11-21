@@ -53,6 +53,7 @@ export function buildRace(tracks: TrackingResult, zones: ZonesResult | undefined
     camera: zones && readCamera(zones),
     // Sin metros no hay puestos: elegimos al que se siguió por más tiempo.
     defaultId: [...runners].sort((a, b) => b.nObs - a.nObs)[0]?.id,
+    raw: { tracks, zones },
   }
 }
 

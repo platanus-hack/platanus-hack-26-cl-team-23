@@ -21,6 +21,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/narration/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Narrate
+         * @description Relato del clip: hechos → guion → voz. Repetir el mismo video sale de caché.
+         */
+        post: operations["narrate_api_narration__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/narration/{key}/audio/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audio
+         * @description Audio de un tramo del relato.
+         */
+        get: operations["audio_api_narration__key__audio__index__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tracking/detect": {
         parameters: {
             query?: never;
@@ -228,6 +268,76 @@ export interface components {
             env: string;
             /** Version */
             version: string;
+        };
+        /** NarrationRequest */
+        NarrationRequest: {
+            /** @description Salida de /api/tracking/track */
+            tracks: components["schemas"]["TrackingResult"];
+            /** @description Salida de /api/zones/ (opcional: sin ella no hay relato de cámara) */
+            zones?: components["schemas"]["ZonesResult"] | null;
+            /**
+             * Style
+             * @description Registro del relato
+             * @default transmision
+             * @enum {string}
+             */
+            style: "transmision" | "analisis";
+            /**
+             * Segment S
+             * @description Duración objetivo de cada tramo narrado
+             * @default 8
+             */
+            segment_s: number;
+        };
+        /** NarrationResponse */
+        NarrationResponse: {
+            /** Key */
+            key: string;
+            /** Cached */
+            cached: boolean;
+            /**
+             * Source
+             * @description De dónde salió el guion
+             * @enum {string}
+             */
+            source: "llm" | "template";
+            /**
+             * Disclaimer
+             * @description Qué NO mide el sistema; se muestra al pie
+             */
+            disclaimer: string;
+            /** Segments */
+            segments: components["schemas"]["NarrationSegment"][];
+            /**
+             * Audio
+             * @description URL de cada segmento: GET /api/narration/{key}/audio/{index}
+             */
+            audio: string[];
+            /**
+             * Characters
+             * @description Caracteres enviados a ElevenLabs (su unidad de cobro)
+             */
+            characters: number;
+        };
+        /** NarrationSegment */
+        NarrationSegment: {
+            /**
+             * Start
+             * @description Segundo del video en que empieza este tramo
+             */
+            start: number;
+            /**
+             * End
+             * @description Segundo del video en que termina
+             */
+            end: number;
+            /** Text */
+            text: string;
+            /**
+             * Duration S
+             * @description Duración real del audio. Puede superar la ventana: entonces la voz termina después del corte y el front encadena los tramos sin cortar palabras.
+             */
+            duration_s?: number | null;
         };
         /** PipelineInfo */
         PipelineInfo: {
@@ -563,6 +673,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    narrate_api_narration__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NarrationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NarrationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audio_api_narration__key__audio__index__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/mpeg": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -106,6 +106,9 @@ tmp/
 *.bak
 .vercel
 .env*
+# ...pero la plantilla sí va en git: el README pide copiarla para levantar el backend.
+!.env.example
+!**/.env.example
 
 # Artefactos de depuración del pipeline de tracking (se regeneran con app.cv.cli)
 *.tracked.mp4
