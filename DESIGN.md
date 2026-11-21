@@ -89,18 +89,20 @@ Reglas:
 
 ## 4. Logo
 
-La curva de una pista vista desde arriba: tres carriles concéntricos en forma de "D". Los dos interiores en tinta y **el exterior en naranja**, porque ir por fuera es lo que medimos.
+**"Carriles": una T hecha de carriles.** Una barra arriba y tres carriles que bajan; los dos de los costados nacen de la barra con una curva, como una pista que dobla. Monocroma en tinta `#1D1D1F`. El color de acento de la marca se define más adelante: mientras tanto no se le agrega ninguno.
 
 ```svg
-<svg viewBox="0 0 40 40" fill="none" stroke-linecap="round" stroke-width="3.4" xmlns="http://www.w3.org/2000/svg">
-  <path d="M4 14.5 H17 A5.5 5.5 0 0 1 17 25.5 H4" stroke="#1D1D1F"/>
-  <path d="M4 9.5 H17 A10.5 10.5 0 0 1 17 30.5 H4" stroke="#1D1D1F"/>
-  <path d="M4 4.5 H17 A15.5 15.5 0 0 1 17 35.5 H4" stroke="#FF5B14"/>
+<svg viewBox="0 0 40 40" fill="none" stroke="#1D1D1F" stroke-width="3.6" stroke-linecap="round" xmlns="http://www.w3.org/2000/svg">
+  <path d="M4 6 H36"/>
+  <path d="M4 13 H8 A6 6 0 0 1 14 19 V36"/>
+  <path d="M36 13 H32 A6 6 0 0 0 26 19 V36"/>
+  <path d="M20 13 V36"/>
 </svg>
 ```
 
-- Junto al nombre **"Trazada"** (SF Pro / Inter, peso 600, interletra −0,02 em), con la marca a la izquierda.
-- Sobre fondo oscuro, los carriles interiores pasan a blanco; el exterior sigue en naranja.
+- Junto al nombre **"Trazada"** (SF Pro Display / Inter, peso 600, interletra −0,02 em), con la marca a la izquierda.
+- Sobre fondo oscuro, el trazo pasa a blanco. En código, la marca usa `currentColor` y toma el color del texto que la rodea.
+- Archivo fuente: `research/pitch/logo/trazada-marca.svg`. En la app: `TrackMark` (`frontend/spa/src/components/trazada/ui.tsx`) y `frontend/spa/public/favicon.svg`.
 - No rotar, no deformar, no agregar sombras ni degradados.
 
 ---
