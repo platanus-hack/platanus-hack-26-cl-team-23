@@ -74,6 +74,36 @@ class ZoneFilter:
         if 1.0 / np.sum(self.w ** 2) < self.n / 2:
             self._resample()
 
+    def update_x(self, x_obs: float, sigma: float = 3.0):
+        """Observación directa de los metros recorridos (p. ej. paso por la meta). Las partículas
+        cuya velocidad las dejó en el lugar correcto sobreviven: así se aprende también el ritmo."""
+        lik = np.exp(-0.5 * ((self.x - x_obs) / sigma) ** 2)
+        if (self.w * lik).sum() < 1e-12:      # todo lejos: se acerca la nube en vez de descartarla
+            self.x += x_obs - float(np.sum(self.w * self.x))
+            lik = np.exp(-0.5 * ((self.x - x_obs) / sigma) ** 2)
+        self.w = self.w * lik
+        self.w /= self.w.sum()
+        self._resample()
+
+    def update_v(self, v_obs: float, sigma: float = 0.8, inject: float = 0.0):
+        """Medición directa de la velocidad (p. ej. contra marcas de la pista).
+
+        `inject`: fracción de partículas que se re-sortean alrededor de la medición antes de
+        pesar. Sin esto, si el ritmo sale del rango del prior (vuelta táctica a 5,6 m/s con un
+        prior de 6,3–7,1) no hay partículas ahí y el filtro solo se arrastra de a poco."""
+        if inject > 0:
+            k = self.rng.random(self.n) < inject
+            self.v[k] = self.rng.normal(v_obs, sigma, k.sum())
+        lik = np.exp(-0.5 * ((self.v - v_obs) / sigma) ** 2)
+        if (self.w * lik).sum() < 1e-12:      # todas lejos: se corre la nube hacia la medición
+            self.v += 0.5 * (v_obs - float(np.sum(self.w * self.v)))
+            lik = np.exp(-0.5 * ((self.v - v_obs) / sigma) ** 2)
+        self.w = self.w * lik
+        self.w /= self.w.sum()
+        if 1.0 / np.sum(self.w ** 2) < self.n / 2:
+            self._resample()
+            self.v += self.rng.normal(0, 0.05, self.n)    # sin esto la nube de v colapsa
+
     def _resample(self):
         idx = self.rng.choice(self.n, self.n, p=self.w)
         self.x, self.v = self.x[idx], self.v[idx]
