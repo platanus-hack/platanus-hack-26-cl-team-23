@@ -1,0 +1,96 @@
+vars: {
+  d2-config: {
+    layout-engine: dagre
+    theme-id: 0
+    pad: 40
+  }
+}
+
+direction: down
+
+classes: {
+  box: {
+    style: {
+      border-radius: 10
+      stroke-width: 2
+    }
+  }
+  ext: {
+    style: {
+      border-radius: 10
+      stroke-dash: 4
+      fill: "#FFF8E1"
+      stroke: "#F9A825"
+    }
+  }
+  out: {
+    style: {
+      border-radius: 10
+      fill: "#FFFFFF"
+      stroke: "#2E7D32"
+    }
+  }
+}
+
+spa: "1 · Navegador (SPA React)" {
+  style.fill: "#F5F5F7"
+  style.stroke: "#1D1D1F"
+  style.border-radius: 14
+
+  video: "Video de la carrera" {class: box}
+  frames: "Extrae cuadros\n10 fps · JPEG ≤960 px" {class: box}
+  batches: "Lotes de 24\nhasta 3 en paralelo" {class: box}
+  video -> frames -> batches
+}
+
+cv: "2 · Visión por computador (FastAPI)" {
+  style.fill: "#EEF3FF"
+  style.stroke: "#3B5BDB"
+  style.border-radius: 14
+
+  detect: "/tracking/detect\ncajas por cuadro" {class: box}
+  track: "/tracking/track\nids estables · ByteTrack" {class: box}
+  features: "/zones/features\nevidencia visual" {class: box}
+  zones: "/zones/\nzona Z1..Z6 por cuadro" {class: box}
+  detect -> track
+  features -> zones
+}
+
+story: "3 · Relato de la carrera (POST /narration)" {
+  style.fill: "#EEF3FF"
+  style.stroke: "#3B5BDB"
+  style.border-radius: 14
+
+  facts: "Hechos\nresumen determinista" {class: box}
+  script: "Guion" {class: box}
+  check: "Validación\ncifras · léxico · cobertura" {class: box}
+  voice: "Voz\n1 petición por tramo" {class: box}
+  templates: "Plantillas\ndeterministas" {class: box; style.stroke-dash: 4}
+  facts -> script -> check -> voice
+  check -> templates: "falla" {style.stroke-dash: 4}
+  templates -> voice {style.stroke-dash: 4}
+}
+
+ui: "4 · Interfaz TRAZADA" {
+  style.fill: "#E8F5E9"
+  style.stroke: "#2E7D32"
+  style.border-radius: 14
+
+  boxes: "Video con cajas\ny id por corredor" {class: out}
+  list: "Lista de corredores\ntiempos · on_track" {class: out}
+  cenital: "Vista cenital\ntramo que enfoca la cámara" {class: out}
+  voz: "Relato con voz\nsincronizado al play" {class: out}
+}
+
+roboflow: "Roboflow" {class: ext}
+claude: "Claude\ntool use obligado" {class: ext}
+eleven: "ElevenLabs\neleven_v4" {class: ext}
+
+spa -> cv.detect
+spa -> cv.features
+cv.detect <-> roboflow: {style.stroke-dash: 4}
+cv -> story.facts: "tracks + zonas"
+story.script <-> claude: {style.stroke-dash: 4}
+story.voice -> eleven: {style.stroke-dash: 4}
+cv -> ui: "cajas · ids · zonas"
+story -> ui: "texto + mp3"

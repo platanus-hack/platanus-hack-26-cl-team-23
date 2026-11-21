@@ -1,0 +1,52 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+    theme-id: 0
+    pad: 40
+  }
+}
+
+direction: right
+
+user: "Usuario" {shape: person}
+
+vercel: "Vercel Services (producción)" {
+  style.fill: "#F5F5F7"
+  style.stroke: "#1D1D1F"
+  style.border-radius: 14
+
+  router: "vercel.json\nruteo" {style.border-radius: 10}
+  spa: "spa\nReact 19 · Vite · Bun" {style.border-radius: 10}
+  orch: "orchestrator\nFastAPI · Python 3.13" {style.border-radius: 10}
+  router -> spa: "/*"
+  router -> orch: "/api/*"
+}
+
+gha: "GitHub Actions\nDeploy Vercel (manual)" {style.border-radius: 10}
+gcp: "GCP · Terraform (alternativa)" {
+  style.fill: "#EEF3FF"
+  style.stroke: "#3B5BDB"
+  style.border-radius: 14
+
+  run: "Cloud Run\n128Mi · 0–1 instancias" {style.border-radius: 10}
+  gae: "App Engine Standard\nF1 · 0–1 idle" {style.border-radius: 10}
+}
+
+apis: "APIs externas" {
+  style.fill: "#FFF8E1"
+  style.stroke: "#F9A825"
+  style.border-radius: 14
+
+  rf: "Roboflow"
+  an: "Anthropic Claude"
+  el: "ElevenLabs"
+  blob: "Vercel Blob\n(o disco local)"
+}
+
+user -> vercel.router
+gha -> vercel: "dev → preview\nmain → production" {style.stroke-dash: 4}
+vercel.orch -> apis.rf
+vercel.orch -> apis.an
+vercel.orch -> apis.el
+vercel.orch -> apis.blob
+gcp.run -> apis.rf: {style.stroke-dash: 4}
