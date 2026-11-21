@@ -58,6 +58,29 @@ dónde parte y el ritmo plausible). La zona sale sobre todo del reloj de carrera
 la zona estará mal. Calibrado solo con la final 1500 m NCAA 2025 (≈86 % de exactitud); la memoria
 de cámaras necesita >40 s de video. Detalle en `research/trazada/README.md`.
 
+### Atletas (`/api/athletes`)
+
+Posición y velocidad de **cada atleta respecto a la cancha**, por triangulación:
+posición atleta = posición del grupo (`x`, `v` de `/zones`) + posición relativa al grupo, medida
+dentro de cada frame (paneos y zooms no la afectan). Mismo patrón sin estado:
+
+| Ruta | Para qué |
+|---|---|
+| `POST /athletes/features` | Lote de frames **consecutivos** (multipart: `frames` JPEG, `t`, `boxes` = JSON por frame `[[id,x1,y1,x2,y2],...]` con los ids de `/track`, opcional `orig_width/orig_height` si las cajas están en píxeles del video original; máx. 24) → por corredor `ds` (m relativo al grupo), `d` (m al bordillo), color de camiseta; por frame `u_img`, `head_on`, `blind`, `bg_shift` |
+| `POST /athletes/` | JSON `{t0, field_size, frames:[...features...], group:[{x, v, cut} por frame, de /zones]}` → por frame cada atleta: `id` estable, `rank`, `x`, `s`, `d`, `lane`, `v`, `u`, `visible`, `bbox` |
+
+- Regla longitudinal: el alto del cuerpo (~1,75 m; el ancho varía ×3 con la zancada). Regla
+  lateral: las calles (1,22 m), contadas hasta el bordillo.
+- "Adelante" sale del movimiento de los corredores respecto al fondo (`bg_shift`, medido entre
+  frames consecutivos del lote): mandar lotes de frames seguidos.
+- Tras un corte, los atletas se re-identifican por posición predicha + color de camiseta, y
+  nunca hay más que `field_size`.
+- En primeros planos sin calles visibles (`blind`) no se mide: los atletas conservan identidad y
+  su posición es predicción.
+- Validado en video sintético (Δs entre atletas ±0,5 m, d al bordillo ±0,33 m) y, sin verdad
+  por atleta, con chequeos físicos en la final 1500 m NCAA 2025 a 15 fps: 15 IDs para 12
+  corredores, todas las velocidades entre 5,9 y 7,2 m/s (p5-p95), 94 % en calles 1-2.
+
 `/detect` y `/process` gastan créditos de Roboflow: si `DEMO_ACCESS_KEY` está definida exigen el
 header `X-Demo-Key`. Las variables `ROBOFLOW_*`, `BLOB_*` y `STORAGE_BACKEND` son opcionales al
 arrancar (ver `.env.example`).

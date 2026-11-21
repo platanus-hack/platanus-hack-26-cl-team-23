@@ -201,10 +201,191 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/athletes/features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Features
+         * @description Medición por frame: posición de cada corredor relativa al grupo y al bordillo.
+         */
+        post: operations["features_api_athletes_features_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/athletes/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Athletes
+         * @description Posición y velocidad de cada atleta respecto a la cancha (grupo + relativo al grupo).
+         */
+        post: operations["athletes_api_athletes__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AthleteFeaturesResponse */
+        AthleteFeaturesResponse: {
+            /** Frames */
+            frames: components["schemas"]["AthleteFrameFeatures"][];
+        };
+        /** AthleteFrameFeatures */
+        AthleteFrameFeatures: {
+            /**
+             * T
+             * @description Segundos dentro del video
+             */
+            t: number;
+            /**
+             * U Img
+             * @description Dirección de imagen sobre la que se midió ds (None: sin geometría)
+             */
+            u_img: number[] | null;
+            /**
+             * Head On
+             * @description La pista se aleja de la cámara (ds es profundidad)
+             */
+            head_on: boolean;
+            /**
+             * Blind
+             * @description Primer plano sin geometría confiable: no hay medición
+             */
+            blind: boolean;
+            /**
+             * Bg Shift
+             * @description Movimiento del fondo (px) desde el frame anterior del mismo lote
+             */
+            bg_shift: number[] | null;
+            /** Runners */
+            runners: components["schemas"]["RunnerFeatures"][];
+        };
+        /** AthleteState */
+        AthleteState: {
+            /**
+             * Id
+             * @description Atleta (estable a través de cortes de plano)
+             */
+            id: number;
+            /**
+             * Track Id
+             * @description id del tracker de imagen en este frame, si se ve
+             */
+            track_id: number | null;
+            /**
+             * Rank
+             * @description Puesto entre los atletas vistos en los últimos 3 s
+             */
+            rank: number;
+            /**
+             * X
+             * @description Metros recorridos desde la salida
+             */
+            x: number;
+            /**
+             * S
+             * @description Metros desde la meta en sentido de carrera (0-400)
+             */
+            s: number;
+            /**
+             * D
+             * @description Metros al bordillo
+             */
+            d: number;
+            /**
+             * Lane
+             * @description Calle (1 = la de adentro)
+             */
+            lane: number;
+            /**
+             * V
+             * @description Velocidad respecto a la cancha (m/s)
+             */
+            v: number;
+            /**
+             * U
+             * @description Velocidad relativa al grupo (m/s)
+             */
+            u: number;
+            /** Visible */
+            visible: boolean;
+            /**
+             * Sigma X
+             * @description Incertidumbre de x relativa al grupo (m)
+             */
+            sigma_x: number;
+            /** Bbox */
+            bbox: number[] | null;
+        };
+        /** AthletesFrame */
+        AthletesFrame: {
+            /**
+             * Frame
+             * @description Posición en la lista enviada (igual que /track y /zones)
+             */
+            frame: number;
+            /** T */
+            t: number;
+            group: components["schemas"]["GroupOutput"];
+            /**
+             * Measured
+             * @description Hubo geometría para medir en este frame
+             */
+            measured: boolean;
+            /** Athletes */
+            athletes: components["schemas"]["AthleteState"][];
+        };
+        /** AthletesRequest */
+        AthletesRequest: {
+            /**
+             * Source
+             * @default upload
+             */
+            source: string;
+            /**
+             * T0
+             * @description Segundo del video del disparo
+             * @default 0
+             */
+            t0: number;
+            /**
+             * Field Size
+             * @description Corredores en la serie
+             * @default 12
+             */
+            field_size: number;
+            /** Frames */
+            frames: components["schemas"]["AthleteFrameFeatures"][];
+            /** Group */
+            group: components["schemas"]["GroupInput"][];
+        };
+        /** AthletesResult */
+        AthletesResult: {
+            /** T0 */
+            t0: number;
+            /** Frames */
+            frames: components["schemas"]["AthletesFrame"][];
+        };
         /** Body_detect_api_tracking_detect_post */
         Body_detect_api_tracking_detect_post: {
             /**
@@ -227,6 +408,34 @@ export interface components {
              * @description Alto del video original
              */
             orig_height: number;
+        };
+        /** Body_features_api_athletes_features_post */
+        Body_features_api_athletes_features_post: {
+            /**
+             * Frames
+             * @description JPEG/PNG, uno por frame, consecutivos
+             */
+            frames: string[];
+            /**
+             * T
+             * @description Segundos de cada frame, mismo orden
+             */
+            t: number[];
+            /**
+             * Boxes
+             * @description JSON por frame: [[id, x1, y1, x2, y2], ...] (salida de /track)
+             */
+            boxes: string;
+            /**
+             * Orig Width
+             * @description Ancho del video original
+             */
+            orig_width?: number | null;
+            /**
+             * Orig Height
+             * @description Alto del video original
+             */
+            orig_height?: number | null;
         };
         /** Body_features_api_zones_features_post */
         Body_features_api_zones_features_post: {
@@ -254,6 +463,34 @@ export interface components {
             t: number;
             /** Dets */
             dets: number[][];
+        };
+        /**
+         * GroupInput
+         * @description Una fila de la salida de /zones para el mismo frame.
+         */
+        GroupInput: {
+            /**
+             * X
+             * @description Metros recorridos por la cabeza de carrera ('x' de /zones)
+             */
+            x: number;
+            /**
+             * V
+             * @description Su velocidad ('v' de /zones)
+             */
+            v: number;
+            /**
+             * Cut
+             * @default false
+             */
+            cut: boolean;
+        };
+        /** GroupOutput */
+        GroupOutput: {
+            /** X */
+            x: number;
+            /** V */
+            v: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -393,6 +630,40 @@ export interface components {
             result_url?: string | null;
             /** @description Resultado en línea si es liviano; si no, usar result_url */
             result?: components["schemas"]["TrackingResult"] | null;
+        };
+        /** RunnerFeatures */
+        RunnerFeatures: {
+            /**
+             * Id
+             * @description id del tracker de imagen (/track)
+             */
+            id: number | null;
+            /**
+             * Bbox
+             * @description [x1, y1, x2, y2] en píxeles del video original
+             */
+            bbox: number[];
+            /** Foot */
+            foot: number[];
+            /**
+             * Ds
+             * @description m relativo al centro del grupo, en el sentido de u_img
+             */
+            ds: number;
+            /** Sigma Ds */
+            sigma_ds: number;
+            /**
+             * D
+             * @description m al bordillo (None si no se pudo medir)
+             */
+            d: number | null;
+            /** Sigma D */
+            sigma_d: number | null;
+            /**
+             * Jersey
+             * @description Color de camiseta (re-identificación tras cortes)
+             */
+            jersey: number[] | null;
         };
         /** TrackFrameInput */
         TrackFrameInput: {
@@ -960,6 +1231,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ZonesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    features_api_athletes_features_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_features_api_athletes_features_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AthleteFeaturesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    athletes_api_athletes__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AthletesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AthletesResult"];
                 };
             };
             /** @description Validation Error */
