@@ -1,0 +1,117 @@
+vars: {
+  d2-config: {
+    layout-engine: dagre
+    theme-id: 0
+    pad: 40
+  }
+}
+
+direction: down
+
+classes: {
+  step: {style: {border-radius: 10; stroke-width: 2}}
+  model: {style: {border-radius: 10; stroke-width: 2; fill: "#FFF8E1"; stroke: "#F9A825"}}
+  data: {
+    shape: page
+    style: {fill: "#F5F5F7"; stroke: "#8E8E93"; font-size: 13}
+  }
+}
+
+front: "Navegador · TypeScript" {
+  style.fill: "#F5F5F7"
+  style.stroke: "#1D1D1F"
+  style.border-radius: 14
+
+  extract: "Extraer cuadros\n10 fps · JPEG ≤960 px\nlotes de 24" {class: step}
+}
+
+detect: "① Detección · POST /tracking/detect" {
+  style.fill: "#EEF3FF"
+  style.stroke: "#3B5BDB"
+  style.border-radius: 14
+
+  rf: "Roboflow serverless\nRF-DETR Medium (rfdetr-medium)\nconf ≥ 0,2 · solo clase person\n8 hilos · 4 reintentos" {class: model}
+  surf: "Filtro de superficie\n% de píxeles tartán (HSV)\nbajo los pies → on_track" {class: step}
+  rf -> surf: "x1 y1 x2 y2 conf"
+}
+
+track: "② Seguimiento · POST /tracking/track" {
+  style.fill: "#EEF3FF"
+  style.stroke: "#3B5BDB"
+  style.border-radius: 14
+
+  bt: "ByteTrack\nactivación 0,6 · 3 cuadros seguidos\nbúfer de pérdida 30 · IoU ≥ 0,1" {class: step}
+  keep: "Descarta pistas ajenas\non_track ≥ 0,65\nduración ≥ 1 s" {class: step}
+  bt -> keep
+}
+
+zones: "③ Zona de cámara · /zones/features → /zones/" {
+  style.fill: "#EEF3FF"
+  style.stroke: "#3B5BDB"
+  style.border-radius: 14
+
+  ev: "Evidencia por cuadro (OpenCV)\nhistograma HSV · descriptor por bandas\ncurvatura de las líneas blancas" {class: step}
+  cut: "Cortes de plano\nBhattacharyya > 0,19" {class: step}
+  mem: "Memoria de cámaras\nla TV repite planos cada vuelta" {class: step}
+  pf: "Filtro de partículas\n4000 partículas (x, v)\ns = salida + x → Z1..Z6" {class: model}
+  ev -> cut
+  ev -> mem
+  cut -> pf
+  mem -> pf
+  ev -> pf: "curvatura"
+}
+
+ath: "④ Atletas · /athletes/features → /athletes/" {
+  style.fill: "#EEF3FF"
+  style.stroke: "#3B5BDB"
+  style.border-radius: 14
+
+  sel: "Quién es corredor\npies sobre tartán · alto vs mediana\nsin gráficos de TV" {class: step}
+  lat: "Lateral d\ncuenta calles de 1,22 m\nhasta el bordillo" {class: step}
+  lon: "Longitudinal Δs\ncaja ≈ 1,75 m → px/m según la fila\ndirección de las líneas (Hough)" {class: step}
+  bg: "Sentido de avance\ncorrelación de fase del fondo\n+ color de camiseta" {class: step}
+  kf: "Kalman por atleta (x, u, d)\nx = ancla del grupo + Δs\nre-asigna ids tras cortes" {class: model}
+  sel -> lat
+  sel -> lon
+  lat -> kf
+  lon -> kf
+  bg -> kf
+}
+
+out: "Salida por cuadro y atleta" {
+  class: data
+}
+out.label: "id · rank · s (0–400 m) · d · lane · v · σx"
+
+story: "⑤ Relato · POST /narration" {
+  style.fill: "#E8F5E9"
+  style.stroke: "#2E7D32"
+  style.border-radius: 14
+
+  facts: "Hechos deterministas\n(race_facts)" {class: step}
+  llm: "Claude\ntool use → JSON" {class: model}
+  val: "Validación\ncifras · léxico · cobertura" {class: step}
+  tts: "ElevenLabs eleven_v4\n1 mp3 por tramo" {class: model}
+  facts -> llm -> val -> tts
+}
+
+ui: "Interfaz · Canvas 2D" {
+  style.fill: "#F5F5F7"
+  style.stroke: "#1D1D1F"
+  style.border-radius: 14
+
+  draw: "Video + cajas · vista cenital\nficha del corredor\nmetros extra en curva" {class: step}
+}
+
+front.extract -> detect.rf: "JPEG"
+detect.surf -> track.bt: "[x1 y1 x2 y2 conf on_track]"
+front.extract -> zones.ev: "mismos cuadros"
+front.extract -> ath.sel: "mismos cuadros"
+track.keep -> ath.sel: "id + caja"
+zones.pf -> ath.kf: "x y v del grupo\n(cabeza de carrera)"
+ath.kf -> out
+track.keep -> story.facts: "tracks"
+zones.pf -> story.facts: "zonas"
+out -> ui.draw
+story.tts -> ui.draw: "texto + audio"
+track.keep -> ui.draw: "cajas e ids"

@@ -52,8 +52,11 @@ cv: "2 · Visión por computador (FastAPI)" {
   track: "/tracking/track\nids estables · ByteTrack" {class: box}
   features: "/zones/features\nevidencia visual" {class: box}
   zones: "/zones/\nzona Z1..Z6 por cuadro" {class: box}
+  athletes: "/athletes/\nposición y velocidad por atleta" {class: box}
   detect -> track
   features -> zones
+  track -> athletes
+  zones -> athletes
 }
 
 story: "3 · Relato de la carrera (POST /narration)" {
@@ -88,9 +91,10 @@ eleven: "ElevenLabs\neleven_v4" {class: ext}
 
 spa -> cv.detect
 spa -> cv.features
+spa -> cv.athletes: "mismos cuadros"
 cv.detect <-> roboflow: {style.stroke-dash: 4}
 cv -> story.facts: "tracks + zonas"
 story.script <-> claude: {style.stroke-dash: 4}
 story.voice -> eleven: {style.stroke-dash: 4}
-cv -> ui: "cajas · ids · zonas"
+cv -> ui: "cajas · ids · zonas · posiciones"
 story -> ui: "texto + mp3"

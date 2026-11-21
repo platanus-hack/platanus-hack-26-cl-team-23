@@ -21,7 +21,7 @@ Sigue a cada corredor en un video de pista y calcula cuántos metros de más cor
 
 <br /><br />
 
-[**Ver la demo**](https://platanus-hack-26-nid.vercel.app) · [Cómo funciona](#cómo-funciona) · [Infraestructura](#infraestructura) · [Desarrollo](#desarrollo)
+[**Ver la demo**](https://platanus-hack-26-nid.vercel.app) · [Cómo funciona](#cómo-funciona) · [Infraestructura](#infraestructura) · [Diagrama técnico](#diagrama-técnico) · [Desarrollo](#desarrollo)
 
 </div>
 
@@ -68,6 +68,40 @@ En una carrera de 400 m el cronómetro da un tiempo, pero no cuenta **cómo se c
 <div align="center">
   <img src="./docs/assets/infra.svg" alt="Infraestructura: Vercel Services, GCP y APIs externas" width="760" />
 </div>
+
+## Diagrama técnico
+
+El pipeline completo, con el modelo, los filtros y lo que viaja entre etapas:
+
+<div align="center">
+  <img src="./docs/assets/tech.svg" alt="Pipeline técnico: Roboflow RF-DETR, ByteTrack, filtro de partículas de zonas, Kalman por atleta y relato" width="900" />
+</div>
+
+| Etapa | Qué hace | Con qué |
+|---|---|---|
+| **① Detección** | Encuentra personas en cada cuadro | Roboflow serverless · **RF-DETR Medium** (`rfdetr-medium`, `ROBOFLOW_MODEL_ID`), confianza ≥ 0,2, solo clase `person` |
+| **Filtro de superficie** | Descarta público, jueces y camarógrafos | Fracción de píxeles de tartán (HSV) bajo los pies → `on_track` |
+| **② Seguimiento** | Un id estable por corredor | **ByteTrack** (`supervision` + `trackers`): activación 0,6, 3 cuadros seguidos, búfer de pérdida de 30 |
+| **③ Zona de cámara** | Qué tramo de la pista enfoca la cámara (Z1..Z6) | OpenCV (histogramas, curvatura de líneas), detector de cortes de plano, memoria de cámaras y **filtro de partículas** (4000) |
+| **④ Atletas** | Posición y velocidad de cada corredor respecto a la cancha | Medición por cuadro (calles de 1,22 m, cuerpo de 1,75 m, correlación de fase) + **Kalman por atleta** |
+| **⑤ Relato** | Texto verificado y voz | Claude (tool use) → validación → ElevenLabs `eleven_v4` |
+
+### De píxeles a metros
+
+Cada etapa cambia de sistema de coordenadas. La clave es que **lo relativo se mide dentro de un solo
+cuadro** (así los paneos y zooms de la TV no importan) y el filtro de zonas aporta el ancla absoluta:
+
+<div align="center">
+  <img src="./docs/assets/coords.svg" alt="Transformaciones de coordenadas: de píxeles del video a metros sobre la pista de 400 m" width="460" />
+</div>
+
+- `posición del atleta = posición del grupo (zonas) + posición relativa al grupo (medida en el cuadro)`.
+- `velocidad del atleta = velocidad del grupo + velocidad relativa al grupo`.
+- **Metros extra:** en una curva, quien corre a `d` m del bordillo recorre `(R + d) / (R + 0,3)` veces lo que la
+  línea de medición de la calle 1. La diferencia, sumada cuadro a cuadro, es lo que le cuesta ir por fuera.
+  Es una estimación: `d` tiene unos 0,3 m de error.
+
+> Diagramas en [`docs/tech.d2`](./docs/tech.d2) y [`docs/coords.d2`](./docs/coords.d2). Se regeneran con `make docs`.
 
 ## Hecho con
 
@@ -217,24 +251,27 @@ extraer cuadros (10 fps, JPEG ≤960 px)
   └─ mismos lotes ─► POST /api/zones/features   (evidencia visual del encuadre)
 POST /api/tracking/track   ─► ids estables por corredor (ByteTrack)
 POST /api/zones/           ─► zona Z1..Z6 que enfoca la cámara en cada cuadro
+POST /api/athletes/features ─► (mismos cuadros + ids de /track) medición por cuadro: Δs y d
+POST /api/athletes/         ─► posición y velocidad de cada atleta (grupo + relativo al grupo)
 ```
 
-Los dos resultados se unen por el número de cuadro (`frames[].frame`, la posición en la lista
-enviada). Hasta tres lotes viajan en paralelo; si las zonas fallan, la carrera se arma igual
-con el seguimiento. `app/tests/test_frontend_contract.py` verifica esa cadena completa.
+Los resultados se unen por el número de cuadro (`frames[].frame`, la posición en la lista
+enviada). Hasta tres lotes viajan en paralelo; las zonas y los atletas son extras: si fallan, la
+carrera se arma igual con el seguimiento. `app/tests/test_frontend_contract.py` verifica esa cadena.
 
 La pantalla muestra **solo lo que devuelven esos endpoints**: el video con las cajas y el id
-de cada corredor, la lista de corredores seguidos con sus tiempos y su `on_track`, y la vista
-cenital con el tramo de pista que enfoca la cámara. No hay datos de ejemplo ni simulaciones:
-sin video subido no hay nada que mostrar.
+de cada corredor, la lista de atletas por puesto con su velocidad, la vista cenital con la
+posición de cada uno sobre la pista y la ficha del corredor. No hay datos de ejemplo ni
+simulaciones: sin video subido no hay nada que mostrar.
 
 El backend además guarda resultados precomputados (`GET /api/tracking/presets/{name}`,
 `POST /api/tracking/process`, `uv run python -m app.cv.publish_presets`), pero el front no
 los consume.
 
-Lo que todavía no existe es la geometría por corredor (metros sobre la pista, distancia a la
-cuerda, metros extra en la curva): hace falta la homografía por cuadro, que vive en
-`research/trazada` y aún no tiene endpoint. Hasta entonces no se dibuja nada de eso.
+La geometría por corredor (metros sobre la pista, distancia al bordillo, metros extra en la curva)
+**no usa homografía**: sale de medir dentro de cada cuadro y anclar al grupo con el filtro de zonas
+(ver [De píxeles a metros](#de-píxeles-a-metros)). Son estimaciones por video, no tiempos oficiales.
+La calibración con homografía vive aparte, en `research/trazada`, y no tiene endpoint.
 
 ## Relato de la carrera
 
