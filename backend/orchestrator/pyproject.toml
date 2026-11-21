@@ -9,11 +9,23 @@ dependencies = [
     "pydantic>=2.9.0",
     "python-dotenv>=1.0.1",
     "httpx>=0.28.0",
-    "granian[reload]>=2.8.8",
+    "trackers>=2.7.0",
+    "inference-sdk>=1.8",
+    "supervision>=0.32",
+    "opencv-python-headless>=4.8",
+    "numpy>=2.0",
+    "vercel-blob>=0.5.0",
+    "python-multipart>=0.0.34",
+    "anthropic>=0.40",
+    "elevenlabs>=2.0",
 ]
 
 [dependency-groups]
+server = [
+    "granian[reload]>=2.8.8",
+]
 dev = [
+    {include-group = "server"},
     "pytest>=8.3.0",
     "httpx>=0.28.0",
     "poethepoet>=0.34.0",
@@ -22,6 +34,7 @@ dev = [
 
 [tool.poe.tasks]
 dev = "granian --interface asgi --host 0.0.0.0 --port 8080 --reload app.main:app"
+openapi.shell = "python -c 'import json; from app.main import app; print(json.dumps(app.openapi(), indent=2))'"
 test = "pytest -q"
 lint = "ruff check ."
 fmt = "ruff format ."
@@ -33,3 +46,13 @@ pythonpath = ["."]
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+
+[tool.uv]
+# `trackers` pide opencv-python (con GUI/libGL); en serverless solo sirve la variante headless.
+# `av` y `matplotlib` los pide `supervision` pero no se usan (solo Detections); pesan ~100 MB
+# y el bundle de Vercel no puede superar 500 MB.
+override-dependencies = [
+    "opencv-python; sys_platform == 'never'",
+    "av; sys_platform == 'never'",
+    "matplotlib; sys_platform == 'never'",
+]

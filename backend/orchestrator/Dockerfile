@@ -10,10 +10,10 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /api
 
 COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --group server --no-install-project
 
 COPY app ./app
 
 EXPOSE 8080
 
-CMD ["uv", "run", "--no-dev", "granian", "--interface", "asgi", "--host", "0.0.0.0", "--port", "8080", "app.main:app"]
+CMD ["uv", "run", "--no-dev", "--group", "server", "granian", "--interface", "asgi", "--host", "0.0.0.0", "--port", "8080", "app.main:app"]

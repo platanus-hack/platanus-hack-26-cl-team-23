@@ -106,3 +106,21 @@ tmp/
 *.bak
 .vercel
 .env*
+# ...pero la plantilla sí va en git: el README pide copiarla para levantar el backend.
+!.env.example
+!**/.env.example
+
+# Artefactos de depuración del pipeline de tracking (se regeneran con app.cv.cli)
+*.tracked.mp4
+*.detections.json
+
+# Videos de ejemplo y resultados: viven en Vercel Blob (presets/), publicar con app.cv.publish_presets
+backend/orchestrator/app/assets/
+
+# Investigación local (no subir)
+research/
+trazada.html
+.claude/settings.local.json
+
+# Video de ejemplo NCCA: solo local para desarrollar el front (Andrés lo sirve desde el backend)
+frontend/spa/public/demo/

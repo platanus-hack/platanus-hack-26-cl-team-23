@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install dev test lint fmt reqs vercel-dev deploy
+.PHONY: help install dev test lint fmt types reqs vercel-dev deploy
 
 help: ## Mostrar comandos disponibles
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -25,6 +25,12 @@ lint: ## Lint del orchestrator
 
 fmt: ## Formatear el orchestrator
 	cd backend/orchestrator && uv run poe fmt
+
+types: ## Regenerar los tipos TS del spa desde el OpenAPI del orchestrator
+	cd backend/orchestrator && uv run poe openapi > openapi.json
+	@# se corre desde la raíz a propósito: el spa usa TypeScript 7 y openapi-typescript
+	@# necesita la API de factory de TypeScript 5.
+	bunx openapi-typescript backend/orchestrator/openapi.json -o frontend/spa/src/types/api.gen.ts
 
 reqs: ## Regenerar requirements.txt para Vercel
 	cd backend/orchestrator && uv export --no-dev --no-hashes \

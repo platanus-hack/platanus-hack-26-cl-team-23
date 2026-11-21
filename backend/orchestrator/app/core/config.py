@@ -61,6 +61,36 @@ class Settings:
         # HTTP client
         self.http_timeout: float = _require_float("HTTP_TIMEOUT")
 
+        # Roboflow (opcionales: solo se exigen al procesar video, no al arrancar)
+        self.roboflow_api_key: str = os.getenv("ROBOFLOW_API_KEY", "").strip()
+        self.roboflow_api_url: str = os.getenv(
+            "ROBOFLOW_API_URL", "https://serverless.roboflow.com"
+        ).strip()
+        self.roboflow_model_id: str = os.getenv("ROBOFLOW_MODEL_ID", "rfdetr-medium").strip()
+
+        # Almacenamiento: Vercel Blob o disco local (auto = Blob solo si hay credenciales)
+        self.blob_store_id: str = os.getenv("BLOB_STORE_ID", "").strip()
+        self.blob_access: str = os.getenv("BLOB_ACCESS", "public").strip().lower()
+        if self.blob_access not in {"public", "private"}:
+            raise RuntimeError("Environment variable BLOB_ACCESS must be 'public' or 'private'")
+        self.storage_backend: str = os.getenv("STORAGE_BACKEND", "auto").strip().lower()
+        if self.storage_backend not in {"auto", "blob", "local"}:
+            raise RuntimeError("Environment variable STORAGE_BACKEND must be auto, blob or local")
+        self.local_storage_dir: Path = _PROJECT_ROOT / ".cache" / "storage"
+
+        # Narración: Claude escribe el guion y ElevenLabs lo lee. Ambos opcionales:
+        # sin credenciales el relato cae a plantillas y queda sin voz, sin romper la API.
+        self.anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "").strip()
+        self.anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5").strip()
+        self.eleven_labs_api_key: str = os.getenv("ELEVEN_LABS_API_KEY", "").strip()
+        self.eleven_labs_voice_id: str = os.getenv(
+            "ELEVEN_LABS_VOICE_ID", "ClNifCEVq1smkl4M3aTk"
+        ).strip()
+        self.eleven_labs_model: str = os.getenv("ELEVEN_LABS_MODEL", "eleven_v4").strip()
+
+        # Si se define, /detect y /process exigen el header X-Demo-Key
+        self.demo_access_key: str = os.getenv("DEMO_ACCESS_KEY", "").strip()
+
     @property
     def is_local(self) -> bool:
         return self.app_env.lower() == "local"

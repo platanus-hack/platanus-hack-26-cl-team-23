@@ -33,6 +33,76 @@ El archivo `.env` se carga automáticamente al iniciar la app (`app/core/config.
 
 - `GET /api/health` → estado de la API
 
+### Tracking (`/api/tracking`, ver `/docs`)
+
+| Ruta | Para qué |
+|---|---|
+| `POST /detect` | Detección **paralela** de un lote de frames (multipart: `frames` JPEG, `t` en segundos, `orig_width`, `orig_height`; máx. 24 frames y 4,5 MB por petición). Devuelve `[x1,y1,x2,y2,conf,on_track]` por frame, en píxeles del video original |
+| `POST /track` | ByteTrack sin estado sobre las detecciones acumuladas (JSON `frames:[{t, dets}]`) → JSON del contrato |
+| `POST /process` | Pipeline **completo** sobre `{"source":"NCCA"}` o `{"blob":"videos/x.mp4"}` (máx. 40 s). Cachea por hash del video |
+| `GET /presets/{name}` | Resultado precomputado de un video de ejemplo (`NCCA`) |
+| `GET /results/{key}` | Resultado guardado por `/process` |
+
+### Zonas (`/api/zones`)
+
+Dice en qué zona de la pista (Z1..Z6) enfoca la cámara en cada frame, para videos de TV donde no
+hay calibración fija. Mismo patrón que detect → track (sin estado):
+
+| Ruta | Para qué |
+|---|---|
+| `POST /zones/features` | Lote de frames (multipart: `frames` JPEG, `t`; máx. 24) → por frame `hist` (cortes de plano), `desc` (apariencia), `bend/chord/n` (curvatura de líneas) |
+| `POST /zones/` | JSON `{distance, t0, frames:[{t, hist, desc?, bend?, chord?, n?}]}` → por frame `zone`, `p[6]`, `s`, `x`, `cut`, ... (`frame` = posición en la lista, igual que `/track`) |
+
+`t0` es el segundo del video en que suena el disparo; `distance`, los metros de la prueba (define
+dónde parte y el ritmo plausible). La zona sale sobre todo del reloj de carrera: si `t0` está mal,
+la zona estará mal. Calibrado solo con la final 1500 m NCAA 2025 (≈86 % de exactitud); la memoria
+de cámaras necesita >40 s de video. Detalle en `research/trazada/README.md`.
+
+### Atletas (`/api/athletes`)
+
+Posición y velocidad de **cada atleta respecto a la cancha**, por triangulación:
+posición atleta = posición del grupo (`x`, `v` de `/zones`) + posición relativa al grupo, medida
+dentro de cada frame (paneos y zooms no la afectan). Mismo patrón sin estado:
+
+| Ruta | Para qué |
+|---|---|
+| `POST /athletes/features` | Lote de frames **consecutivos** (multipart: `frames` JPEG, `t`, `boxes` = JSON por frame `[[id,x1,y1,x2,y2],...]` con los ids de `/track`, opcional `orig_width/orig_height` si las cajas están en píxeles del video original; máx. 24) → por corredor `ds` (m relativo al grupo), `d` (m al bordillo), color de camiseta; por frame `u_img`, `head_on`, `blind`, `bg_shift` |
+| `POST /athletes/` | JSON `{t0, field_size, frames:[...features...], group:[{x, v, cut} por frame, de /zones]}` → por frame cada atleta: `id` estable, `rank`, `x`, `s`, `d`, `lane`, `v`, `u`, `visible`, `bbox` |
+
+- Regla longitudinal: el alto del cuerpo (~1,75 m; el ancho varía ×3 con la zancada). Regla
+  lateral: las calles (1,22 m), contadas hasta el bordillo.
+- "Adelante" sale del movimiento de los corredores respecto al fondo (`bg_shift`, medido entre
+  frames consecutivos del lote): mandar lotes de frames seguidos.
+- Tras un corte, los atletas se re-identifican por posición predicha + color de camiseta, y
+  nunca hay más que `field_size`.
+- En primeros planos sin calles visibles (`blind`) no se mide: los atletas conservan identidad y
+  su posición es predicción.
+- Validado en video sintético (Δs entre atletas ±0,5 m, d al bordillo ±0,33 m) y, sin verdad
+  por atleta, con chequeos físicos en la final 1500 m NCAA 2025 a 15 fps: 15 IDs para 12
+  corredores, todas las velocidades entre 5,9 y 7,2 m/s (p5-p95), 94 % en calles 1-2.
+
+`/detect` y `/process` gastan créditos de Roboflow: si `DEMO_ACCESS_KEY` está definida exigen el
+header `X-Demo-Key`. Las variables `ROBOFLOW_*`, `BLOB_*` y `STORAGE_BACKEND` son opcionales al
+arrancar (ver `.env.example`).
+
+**Almacenamiento:** Vercel Blob (`BLOB_STORE_ID` + token OIDC, automático en Vercel) o disco local
+en `.cache/storage` si no hay credenciales (`STORAGE_BACKEND=auto`). Para probar Blob en local:
+`vercel link` + `vercel env pull`.
+
+**Videos de ejemplo (presets):** `NCCA.mp4` y su `NCCA.tracks.json` no están en git (pesan y
+engordan el bundle de Vercel). Viven en el almacenamiento bajo `presets/`. Los archivos locales
+van en `app/assets/` (ignorado por git) y se publican con:
+
+```bash
+uv run python -m app.cv.publish_presets   # Blob con STORAGE_BACKEND=blob + credenciales, o .cache/storage en local
+```
+
+### CLI de depuración
+
+```bash
+uv run python -m app.cv.cli --source app/assets/NCCA.mp4   # genera app/assets/out/*.tracks.json y .tracked.mp4 (ambos fuera de git)
+```
+
 ## Estructura
 
 ```
@@ -40,7 +110,8 @@ app/
 ├── main.py          # FastAPI app, lifespan, handlers
 ├── api/             # routers
 ├── core/            # config, logger, errores de dominio
-├── clients/         # clientes HTTP externos
+├── clients/         # clientes externos (HTTP, almacenamiento Blob/local)
+├── cv/              # detección (Roboflow), filtro de pista y ByteTrack
 ├── dependencies/    # dependencias de FastAPI
 ├── repositories/    # acceso a datos (stub)
 ├── schemas/         # modelos Pydantic
