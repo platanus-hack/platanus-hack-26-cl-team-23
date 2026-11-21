@@ -1,0 +1,9 @@
+{
+  "folders": [
+    { "path": "frontend/spa", "name": "spa" },
+    { "path": "backend/orchestrator", "name": "orchestrator" }
+  ],
+  "settings": {
+    "python.languageServer": "Pylance"
+  }
+}

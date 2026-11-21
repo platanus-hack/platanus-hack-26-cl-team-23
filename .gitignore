@@ -1,0 +1,108 @@
+# ============================================================
+#  .gitignore — platanus-hack-26
+#  Cubre: macOS, editores, Node/Bun, Python y secretos.
+# ============================================================
+
+# ---------- Secretos y variables de entorno ----------
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# ---------- macOS ----------
+.DS_Store
+.AppleDouble
+.LSOverride
+.Icon?
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# ---------- Editores / IDEs ----------
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ---------- Node / Bun (frontend) ----------
+node_modules/
+dist/
+dist-ssr/
+build/
+.vite/
+coverage/
+.turbo/
+.eslintcache
+.oxlintcache
+*.tsbuildinfo
+
+# Logs de gestores de paquetes
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bun-debug.log*
+
+# Bun NO se ignora: bun.lock debe versionarse
+# (package-lock.json de npm, como alternativa)
+
+# ---------- Python (backend) ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Entornos virtuales
+.venv/
+venv/
+ENV/
+env/
+
+# Cachés y artefactos
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# uv NO se ignora: uv.lock debe versionarse
+# .python-version tampoco se ignora (fija la versión del equipo)
+
+# ---------- Terraform ----------
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# ---------- Misc ----------
+.cache/
+tmp/
+*.bak
+.vercel
+.env*

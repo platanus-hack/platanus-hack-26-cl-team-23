@@ -1,0 +1,19 @@
+{
+  "services": {
+    "spa": {
+      "root": "frontend/spa/",
+      "framework": "vite",
+      "installCommand": "bun install",
+      "buildCommand": "bun run build",
+      "outputDirectory": "dist"
+    },
+    "orchestrator": {
+      "root": "backend/orchestrator/",
+      "entrypoint": "app.main:app"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "orchestrator" } },
+    { "source": "/(.*)", "destination": { "service": "spa" } }
+  ]
+}
