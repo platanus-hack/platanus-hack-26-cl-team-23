@@ -19,8 +19,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
+server = [
     "granian[reload]>=2.8.8",
+]
+dev = [
+    {include-group = "server"},
     "pytest>=8.3.0",
     "httpx>=0.28.0",
     "poethepoet>=0.34.0",

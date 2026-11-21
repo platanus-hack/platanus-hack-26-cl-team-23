@@ -667,6 +667,9 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
 ]
+server = [
+    { name = "granian", extra = ["reload"] },
+]
 
 [package.metadata]
 requires-dist = [
@@ -691,6 +694,7 @@ dev = [
     { name = "pytest", specifier = ">=8.3.0" },
     { name = "ruff", specifier = ">=0.8.0" },
 ]
+server = [{ name = "granian", extras = ["reload"], specifier = ">=2.8.8" }]
 
 [[package]]
 name = "packaging"

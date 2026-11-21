@@ -32,6 +32,16 @@ def _jpeg(width: int = 320, height: int = 180) -> bytes:
     return buffer.tobytes()
 
 
+def _write_preset_video(path: Path, seconds: int = 2, fps: int = 15) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (320, 180))
+    frame = cv2.imdecode(np.frombuffer(_jpeg(), np.uint8), cv2.IMREAD_COLOR)
+    for _ in range(seconds * fps):
+        writer.write(frame)
+    writer.release()
+    assert path.stat().st_size > 0
+
+
 @pytest.fixture
 def override(tmp_path: Path) -> Iterator[Callable[[FakeDetector | Exception], TestClient]]:
     clients: list[TestClient] = []
@@ -42,6 +52,7 @@ def override(tmp_path: Path) -> Iterator[Callable[[FakeDetector | Exception], Te
                 raise detector
             return detector
 
+        _write_preset_video(tmp_path / "presets" / "NCCA.mp4")
         app.dependency_overrides[get_storage] = lambda: LocalStorage(tmp_path)
         app.dependency_overrides[get_detector_provider] = lambda: provider
         client = TestClient(app)
@@ -174,6 +185,13 @@ def test_process_runs_pipeline_then_serves_from_cache(override) -> None:
     assert stored.json()["video"]["source"] == "NCCA.mp4"
 
 
+def test_process_reports_missing_preset_video(override, tmp_path: Path) -> None:
+    client = override(FakeDetector())
+    (tmp_path / "presets" / "NCCA.mp4").unlink()
+
+    assert client.post("/api/tracking/process", json={"source": "NCCA"}).status_code == 404
+
+
 def test_process_requires_exactly_one_source(override) -> None:
     client = override(FakeDetector())
 
@@ -188,8 +206,21 @@ def test_process_requires_exactly_one_source(override) -> None:
     )
 
 
-def test_preset_and_results_lookup(override) -> None:
+def test_preset_and_results_lookup(override, tmp_path: Path) -> None:
     client = override(FakeDetector())
+
+    assert client.get("/api/tracking/presets/NCCA").status_code == 404  # aún no publicado
+    tracked = client.post(
+        "/api/tracking/track",
+        json={
+            "source": "NCCA.mp4",
+            "width": 320,
+            "height": 180,
+            "frames": [{"t": 0.0, "dets": []}],
+        },
+    )
+    assert tracked.status_code == 200, tracked.text
+    (tmp_path / "presets" / "NCCA.tracks.json").write_bytes(tracked.content)
 
     preset = client.get("/api/tracking/presets/NCCA")
     assert preset.status_code == 200

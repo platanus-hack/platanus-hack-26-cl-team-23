@@ -109,3 +109,7 @@ tmp/
 
 # Artefactos de depuración del pipeline de tracking (se regeneran con app.cv.cli)
 *.tracked.mp4
+*.detections.json
+
+# Videos de ejemplo y resultados: viven en Vercel Blob (presets/), publicar con app.cv.publish_presets
+backend/orchestrator/app/assets/

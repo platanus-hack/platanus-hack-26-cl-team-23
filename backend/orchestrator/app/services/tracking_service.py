@@ -24,9 +24,7 @@ from app.schemas.tracking import (
     TrackRequest,
 )
 
-ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 PRESET_VIDEOS = {"NCCA": "NCCA.mp4"}
-PRESET_RESULTS_DIR = ASSETS_DIR / "out"
 
 MAX_BATCH_FRAMES = 24
 MAX_FRAME_BYTES = 1_500_000
@@ -139,7 +137,12 @@ class TrackingService:
             filename = PRESET_VIDEOS.get(request.source)
             if filename is None:
                 raise NotFoundError(f"Video de ejemplo desconocido: {request.source!r}")
-            return await asyncio.to_thread((ASSETS_DIR / filename).read_bytes), filename
+            data = await self._storage.get(f"presets/{filename}")
+            if data is None:
+                raise NotFoundError(
+                    f"El video de ejemplo {request.source!r} no está en el almacenamiento"
+                )
+            return data, filename
 
         pathname = request.blob or ""
         if not pathname.startswith("videos/"):
@@ -240,11 +243,10 @@ class TrackingService:
             raise NotFoundError(f"No hay resultado para la clave {key!r}")
         return data
 
-    @staticmethod
-    async def get_preset(name: str) -> bytes:
+    async def get_preset(self, name: str) -> bytes:
         if name not in PRESET_VIDEOS:
             raise NotFoundError(f"Preset desconocido: {name!r}")
-        path = PRESET_RESULTS_DIR / f"{name}.tracks.json"
-        if not path.is_file():
-            raise NotFoundError(f"El preset {name!r} aún no fue generado")
-        return await asyncio.to_thread(path.read_bytes)
+        data = await self._storage.get(f"presets/{name}.tracks.json")
+        if data is None:
+            raise NotFoundError(f"El preset {name!r} aún no fue publicado")
+        return data

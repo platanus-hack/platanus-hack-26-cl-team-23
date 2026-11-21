@@ -51,10 +51,18 @@ arrancar (ver `.env.example`).
 en `.cache/storage` si no hay credenciales (`STORAGE_BACKEND=auto`). Para probar Blob en local:
 `vercel link` + `vercel env pull`.
 
+**Videos de ejemplo (presets):** `NCCA.mp4` y su `NCCA.tracks.json` no están en git (pesan y
+engordan el bundle de Vercel). Viven en el almacenamiento bajo `presets/`. Los archivos locales
+van en `app/assets/` (ignorado por git) y se publican con:
+
+```bash
+uv run python -m app.cv.publish_presets   # Blob con STORAGE_BACKEND=blob + credenciales, o .cache/storage en local
+```
+
 ### CLI de depuración
 
 ```bash
-uv run python -m app.cv.cli --source app/assets/NCCA.mp4   # genera app/assets/out/*.tracks.json y .tracked.mp4
+uv run python -m app.cv.cli --source app/assets/NCCA.mp4   # genera app/assets/out/*.tracks.json y .tracked.mp4 (ambos fuera de git)
 ```
 
 ## Estructura
