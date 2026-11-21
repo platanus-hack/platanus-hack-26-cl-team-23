@@ -518,6 +518,8 @@ export interface components {
             tracks: components["schemas"]["TrackingResult"];
             /** @description Salida de /api/zones/ (opcional: sin ella no hay relato de cámara) */
             zones?: components["schemas"]["ZonesResult"] | null;
+            /** @description Salida de /api/athletes/ (opcional: con ella el relato habla de puestos, velocidad y adelantamientos) */
+            athletes?: components["schemas"]["AthletesResult"] | null;
             /**
              * Style
              * @description Registro del relato

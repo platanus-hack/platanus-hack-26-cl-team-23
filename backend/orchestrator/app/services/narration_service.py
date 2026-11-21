@@ -25,7 +25,7 @@ from app.clients.storage import Storage
 from app.core.config import settings
 from app.core.domain_errors import ExternalServiceError, NotFoundError, ValidationDomainError
 from app.core.logger import logger
-from app.cv.race_facts import allowed_numbers, build_facts
+from app.cv.race_facts import allowed_numbers, build_facts, runner_ids
 from app.schemas.narration import NarrationRequest, NarrationResponse, NarrationSegment
 
 # Ritmo medido de la voz real (Eleven v4, español): ~2,5 palabras/s. Se deja un margen
@@ -41,60 +41,98 @@ MAX_SEGMENTS = 12
 # Si el modelo se demora más que esto, mejor plantillas que una demo colgada.
 LLM_TIMEOUT_S = 30.0
 # Súbelo al tocar el prompt o las reglas de validación: invalida los guiones en caché.
-PROMPT_VERSION = 4
+PROMPT_VERSION = 6
 # Cuánto puede pasarse la voz de su ventana antes de pedir un recorte (una sola vez).
 # El front acelera hasta 1,35× para encajar cada tramo; por debajo de eso no vale la pena
 # gastar otra llamada al modelo.
 MAX_OVERRUN = 1.3
+# Fracción de las palabras que caben a la que se le pide apuntar: un relato que no deja
+# silencios marea.
+AIM_FILL = 0.75
 
 _KEY_PATTERN = re.compile(r"^[a-f0-9]{16,64}$")
 _DIGIT = re.compile(r"\d+(?:[.,]\d+)?")
 _TRACK_REF = re.compile(r"#\s*\d+")
-# Afirmaciones de resultado que el sistema no puede sostener: no mide la posición de nadie.
+# Afirmaciones de resultado que el sistema no puede sostener. Sin datos de atletas tampoco
+# mide la posición de nadie, así que ahí también se prohíbe todo lo que la insinúe.
+_RESULT_WORDS = (
+    r"gana|ganó|ganando|ganador|remontó|remonta|remontada|récord|oro|plata|bronce|medalla|podio"
+)
 _BANNED = re.compile(
-    r"\b(gana|ganó|ganando|ganador|lidera|liderando|líder|remontó|remonta|remontada|"
-    r"adelantó|adelanta|adelantamiento|récord|oro|plata|bronce|medalla|podio|"
+    rf"\b({_RESULT_WORDS}|"
+    r"lidera|liderando|líder|adelantó|adelanta|adelantamiento|"
     r"primero|segundo|tercero|último lugar|"
     # También delata una posición que no medimos.
     r"comanda|comandando|impone|marca el ritmo|al frente|en punta|cabeza de carrera|"
     r"se escapa|escapó|saca ventaja|ventaja|saca distancia|persigue|pegado)\b",
     re.IGNORECASE,
 )
+# Con atletas medidos sí hay puestos, adelantamientos y ventajas; el resultado sigue vedado
+# porque el clip es un fragmento y la carrera completa no se ve.
+_BANNED_WITH_ATHLETES = re.compile(rf"\b({_RESULT_WORDS})\b", re.IGNORECASE)
 
 SYSTEM_PROMPT = """\
-Eres relator de atletismo para televisión chilena. Comentas un clip que un sistema de \
-visión computacional ya analizó. Lo que escribas se escucha encima del video: tiene que \
-sonar a transmisión, no a informe.
+Eres relator deportivo chileno, de los que narran fútbol en la radio y la tele, hoy a cargo \
+de una carrera de atletismo. Comentas un clip que un sistema de visión por computador ya \
+midió. Tu voz va encima del video: tiene que sonar a transmisión, no a informe.
 
 Recibes un JSON con HECHOS. Es la ÚNICA fuente de verdad.
 
-TONO
-- Presente, energía contenida, ritmo de transmisión en vivo. Nada de leer datos.
-- Frases cortas. Alterna golpes de cuatro a seis palabras con una frase más larga que respire.
-- Recursos de relator: nombrar quién entra y quién sale de cuadro, acompañar el movimiento \
-del encuadre como si siguieras la acción, cerrar con una imagen.
-- Habla del encuadre, la toma o el plano; nunca digas "la cámara" como si fuera un aparato.
+CÓMO SUENA UN RELATOR DE FÚTBOL
+- Narras la jugada mientras ocurre, en presente, con la garganta de quien sigue la pelota: \
+"ahí va el #7", "se le abre por fuera", "mete el cambio", "le cierra la puerta al #3".
+- Cada frase empuja la acción. Una frase corta de golpe, otra más larga que respire.
+- Conoces el juego y lo explicas como comentarista técnico: por qué importa que corra por \
+fuera, qué le cuesta una curva, qué significa un cambio de ritmo.
+- Imágenes de cancha cuando calzan: el pelotón, la cuerda, el carril de afuera, la salida de \
+la curva, el embalaje. Sin forzarlas.
+
+CÓMO NO MAREAR (lo más importante)
+- Una idea por frase. Máximo UN dato numérico por frase y dos por tramo.
+- Deja respirar: usa más o menos tres cuartos de las palabras que caben en cada tramo. Un \
+silencio también es relato.
+- Prioriza lo que CAMBIA: un adelantamiento, un cambio de ritmo, alguien que se abre por fuera, \
+un hueco que se cierra o se abre. Lo que se mantiene igual se dice una vez y se suelta.
+- Nombra a lo más dos corredores por frase, siempre como "el #7". Nunca recites una lista.
+- No repitas un dato ni una muletilla. Cada tramo abre distinto al anterior.
+- Dato técnico siempre traducido a lo que significa: no "va a 24,1 km/h" a secas, sino "a 24,1 \
+por hora y sigue apretando". Velocidades en km/h.
+- Voz serena y firme: sin gritos, sin signos de exclamación en cadena (máximo uno por tramo).
 - Prohibido el relleno: "espectacular", "increíble", "sin palabras", "como pueden ver", \
-"bueno", "eh", "amigos", "señoras y señores".
-- Prohibido sonar a resumen escolar: si una frase no aporta una imagen o un dato, bórrala.
+"bueno", "eh", "amigos", "señoras y señores", "atención".
+
+QUÉ PUEDES DECIR
+Mira `can_claim` y `cannot_claim` de los HECHOS: mandan sobre todo lo demás.
+- Si HECHOS trae `athletes`: puedes hablar del orden entre los atletas medidos, de quién va \
+primero de ese grupo, de los adelantamientos de `passes`, de la velocidad, de la calle y de \
+los metros extra por ir por fuera, de los metros que separan al primero del último y del \
+ritmo del grupo.
+- Si no trae `athletes`: nada de posiciones, liderazgos ni adelantamientos; solo cuántos \
+corredores hay, quién entra y sale de cuadro y qué tramo de pista se ve.
+- `rank` ordena solo al grupo medido. Di "va primero del grupo", nunca "va ganando".
 
 REGLAS DURAS
 1. Nombres: los corredores se llaman solo "#" + su id. No inventes nombres, dorsales, \
 nacionalidades ni clubes.
-2. Prohibido afirmar posiciones, quién lidera, quién adelanta o quién gana: el sistema no \
-mide la posición de cada atleta en la pista. Si lo dices, mientes.
-3. Todo número que menciones debe estar en HECHOS. Prohibido redondear, estimar o inventar \
-tiempos, metros, récords o marcas.
-4. Habla solo de: cuántos corredores siguen, cuántos caben en cuadro, cuándo aparece o se \
-pierde uno, qué tramo de pista enfoca la cámara, cuánto lo recorre, si hubo cortes de plano.
-5. Nunca menciones el modelo, el algoritmo, ByteTrack, Roboflow ni "la IA". Puedes decir \
-"el seguimiento".
-6. Español de Chile neutro, registro televisivo.
-7. No cierres con un resultado: no hay resultado que informar. Cierra con lo que se ve.
+2. Todo número que menciones debe estar en HECHOS. Prohibido redondear, convertir, estimar \
+o inventar tiempos, metros, récords o marcas.
+3. Nunca digas quién gana, ni hables de tiempos finales, parciales, récords, medallas o podio. \
+Es un fragmento de carrera: no hay resultado.
+4. Nunca menciones el modelo, el algoritmo, ByteTrack, Roboflow ni "la IA". Puedes decir \
+"los datos" o "el seguimiento".
+5. Habla del encuadre, la toma o el plano; nunca digas "la cámara" como si fuera un aparato.
+6. Español de Chile, registro televisivo. Cierra con lo que se ve, no con un resultado.
+
+EJEMPLOS DE TONO (las X son huecos: usa SIEMPRE ids y cifras de los HECHOS)
+- "Se abre el #X en la curva, y esa vuelta por fuera se la cobra: X metros de más."
+- "Cambio de ritmo del #X, le pasa al #X por dentro. Ya van a X por hora."
+- "Se estira el grupo: X metros entre el primero y el último."
+- "Tranquilo el pelotón. Nadie se mueve, todos a X por hora."
 
 FORMATO
 Devuelve los segmentos con la herramienta `relato`. Cubren el clip completo, sin huecos \
-ni solapes, en orden. Respeta el máximo de palabras de cada tramo.
+ni solapes, en orden. Respeta el máximo de palabras de cada tramo. El `disclaimer` es una \
+frase corta que aclare que posición y velocidad son estimadas por video.
 """
 
 NARRATION_SCHEMA = {
@@ -123,15 +161,18 @@ NARRATION_SCHEMA = {
 DEFAULT_DISCLAIMER = (
     "El seguimiento ubica a los corredores en la imagen, no su posición en metros sobre la pista."
 )
+ATHLETES_DISCLAIMER = (
+    "Posición y velocidad son estimaciones hechas desde el video; pueden errar unos metros."
+)
 
 STYLE_HINT = {
     "transmision": (
-        "transmisión en vivo: energía alta, frases que se pisan, la sensación de estar "
-        "siguiendo la acción con la mirada"
+        "relator de fútbol en transmisión en vivo: empuja la acción, firme y con ritmo, y cada "
+        "dato técnico lo explica en una frase corta, sin gritar ni atropellar"
     ),
     "analisis": (
-        "análisis de entrenador al borde de la pista: pausado, preciso, sin adornos, "
-        "cada frase con una observación concreta"
+        "comentarista técnico al lado del relator: pausado y preciso, explica el porqué de lo "
+        "que pasa en la pista, una observación concreta por frase"
     ),
 }
 
@@ -139,6 +180,28 @@ STYLE_HINT = {
 def _mp3_seconds(data: bytes) -> float | None:
     """Duración del mp3 sin decodificarlo: ElevenLabs entrega 128 kbps constantes."""
     return round(len(data) * 8 / 128_000, 2) if data else None
+
+
+ATHLETE_GUIDE = (
+    "- athletes.runners[]: por cada atleta, cuándo entra y sale (in_s/out_s), su puesto al "
+    "entrar y al salir dentro del grupo medido (rank_start/rank_end), velocidad media y máxima "
+    "(avg_kmh/max_kmh), calle más usada (lane) y metros extra por ir por fuera (extra_m).\n"
+    "- athletes.field: cuántos se miden, ritmo del grupo (pace_kmh), metros entre el primero y "
+    "el último al empezar y al terminar (spread_start_m/spread_end_m) y quién va primero.\n"
+    "- athletes.timeline[]: foto del grupo cada ~2 s: quién va primero, ritmo, apertura.\n"
+    "- athletes.passes[]: adelantamientos reales, con el segundo en que ocurren. Es lo único "
+    "que puedes contar como adelantamiento.\n"
+    "- athletes.widest: el que más metros extra pierde por ir por fuera (null si nadie pasa de "
+    "1 m: entonces no hables de metros extra).\n"
+    "- side dice por dónde corre cada uno (por dentro / en el medio / por fuera): úsalo para "
+    "narrar, es más claro que el número de calle.\n"
+    "- Calle (lane): 1 es la de adentro, la más corta; mientras más alto el número, más por "
+    "fuera corre. Por la calle 1 NO se pierden metros. extra_m viene null si es "
+    "despreciable: no lo menciones.\n"
+    "- Si no hay adelantamientos (passes vacío), no inventes: habla del ritmo, del orden y de "
+    "quién corre por fuera.\n"
+    "- Los números de calle y de puesto también son cifras de los HECHOS: úsalos tal cual.\n"
+)
 
 
 def _as_text(segments: list[NarrationSegment]) -> str:
@@ -152,7 +215,7 @@ class NarrationService:
         self._storage = storage
 
     async def narrate(self, request: NarrationRequest) -> NarrationResponse:
-        facts = build_facts(request.tracks, request.zones)
+        facts = build_facts(request.tracks, request.zones, request.athletes)
         duration = request.tracks.video.duration_s
         if duration <= 0:
             raise ValidationDomainError("El video no tiene duración: no se puede relatar")
@@ -218,7 +281,11 @@ class NarrationService:
                 logger.warning("Relato: guion descartado en intento %d: %s", attempt, problem)
                 # El segundo intento ve su propio texto y qué se corrigió: sin eso vuelve a fallar igual.
                 feedback = f"{problem}\nTu intento anterior fue:\n{_as_text(segments)}"
-        return self._template_script(facts, windows), "template", DEFAULT_DISCLAIMER
+        return (
+            self._template_script(facts, windows),
+            "template",
+            ATHLETES_DISCLAIMER if "athletes" in facts else DEFAULT_DISCLAIMER,
+        )
 
     async def _ask_claude(
         self,
@@ -229,7 +296,7 @@ class NarrationService:
     ) -> tuple[list[NarrationSegment], str]:
         budget = "\n".join(
             f"- {start:.1f}-{end:.1f} s: máximo {self._max_words(start, end)} palabras "
-            f"(apunta a {self._target_words(start, end)})"
+            f"(apunta a {self._aim_words(start, end)}: deja aire)"
             for start, end in windows
         )
         total = self._max_total_words(windows[-1][1])
@@ -243,7 +310,8 @@ class NarrationService:
             "es la única cifra para decir cuánto se movió la cámara.\n"
             "- camera.timeline[]: qué zona enfoca y en qué ventana de tiempo.\n"
             "- camera.pan_speed_mps: velocidad del barrido del encuadre.\n"
-            "- camera.cuts: cambios de plano.\n\n"
+            "- camera.cuts: cambios de plano.\n"
+            f"{ATHLETE_GUIDE if 'athletes' in facts else ''}\n"
             f"Clip de {windows[-1][1]:.1f} s, dividido en {len(windows)} tramos:\n{budget}\n\n"
             f"El guion completo no puede pasar de {total} palabras.\n"
             "La voz se lee a ~2,2 palabras por segundo: pasarse significa que un tramo se "
@@ -291,7 +359,8 @@ class NarrationService:
             )
             for s in data["segments"]
         ]
-        return segments, str(data.get("disclaimer") or DEFAULT_DISCLAIMER)
+        default = ATHLETES_DISCLAIMER if "athletes" in facts else DEFAULT_DISCLAIMER
+        return segments, str(data.get("disclaimer") or default)
 
     async def _condense(
         self,
@@ -347,7 +416,8 @@ class NarrationService:
             return f"devolvió {len(segments)} tramos y el máximo es {MAX_SEGMENTS}"
 
         allowed = allowed_numbers(facts)
-        track_ids = {float(t["id"]) for t in facts["tracks"]}
+        track_ids = runner_ids(facts)
+        banned_words = _BANNED_WITH_ATHLETES if "athletes" in facts else _BANNED
         ordered = sorted(segments, key=lambda s: s.start)
 
         if ordered[0].start > 0.6:
@@ -373,7 +443,7 @@ class NarrationService:
                     words,
                     self._max_words(segment.start, segment.end),
                 )
-            banned = _BANNED.search(segment.text)
+            banned = banned_words.search(segment.text)
             if banned:
                 return f"afirma un resultado que no podemos sostener: {banned.group(0)!r}"
             for raw in self._numbers(segment.text):
@@ -405,6 +475,8 @@ class NarrationService:
             f"Arranca el clip con {runners['peak_on_screen']} corredores en cuadro.",
             f"El seguimiento confirma {runners['total']} atletas sobre la pista.",
         ]
+        if "athletes" in facts:
+            phrases = self._athlete_phrases(facts["athletes"]) + phrases
         if camera:
             for step in camera["timeline"][:2]:
                 phrases.append(
@@ -428,6 +500,25 @@ class NarrationService:
             )
             for i, (start, end) in enumerate(windows)
         ]
+
+    @staticmethod
+    def _athlete_phrases(athletes: dict) -> list[str]:
+        """Frases secas con lo que sí mide el módulo de atletas, para cuando Claude no responde."""
+        field = athletes["field"]
+        out = []
+        if field["leader_start"] is not None:
+            out.append(f"El #{field['leader_start']} va primero del grupo medido.")
+        if field["pace_kmh"]:
+            out.append(f"El grupo rueda a {field['pace_kmh']} kilómetros por hora.")
+        out.extend(f"El #{p['id']} pasa al #{p['passes']}." for p in athletes["passes"][:2])
+        widest = athletes["widest"]
+        if widest:
+            out.append(
+                f"El #{widest['id']} corre por fuera y gasta {widest['extra_m']} metros de más."
+            )
+        if field["spread_end_m"]:
+            out.append(f"Entre el primero y el último hay {field['spread_end_m']} metros.")
+        return out
 
     # ---------------------------------------------------------------- voz
 
@@ -482,6 +573,11 @@ class NarrationService:
     @staticmethod
     def _target_words(start: float, end: float) -> int:
         return math.ceil(WORDS_PER_SECOND * max(0.5, end - start))
+
+    @classmethod
+    def _aim_words(cls, start: float, end: float) -> int:
+        """Palabras a las que apuntar: menos que las que caben, para que el relato respire."""
+        return max(3, math.floor(cls._target_words(start, end) * AIM_FILL))
 
     @classmethod
     def _max_words(cls, start: float, end: float) -> int:

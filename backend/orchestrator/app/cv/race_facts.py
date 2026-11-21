@@ -6,9 +6,13 @@ No llama a nadie y no inventa nada: convierte /track + /zones en una hoja de hec
 La regla de oro: lo que no esté aquí, el relato no lo puede decir.
 """
 
+import itertools
 import re
+from collections import Counter
 from statistics import median
 
+from app.cv.zones.track import STANDARD
+from app.schemas.athletes import AthletesResult, AthleteState
 from app.schemas.tracking import TrackingResult
 from app.schemas.zones import ZonesResult
 
@@ -23,6 +27,22 @@ CAN_CLAIM = [
     "cuántos cambios de plano hay",
 ]
 
+CAN_CLAIM_ATHLETES = [
+    "el orden entre los atletas medidos (rank) y quién va primero del grupo medido",
+    "los adelantamientos que aparecen en athletes.passes, con su segundo",
+    "la velocidad de cada uno en km/h (media y máxima) y el ritmo del grupo",
+    "por qué calle corre cada uno y cuántos metros extra gasta por ir por fuera",
+    "cuántos metros separan al primero del último medido",
+    "cuántos corredores caben en cuadro y en qué tramo de pista van",
+]
+
+CANNOT_CLAIM_ATHLETES = [
+    "quién gana la carrera, tiempos, parciales, récords o marcas",
+    "el puesto real en la carrera completa: solo se mide al grupo que se ve",
+    "la distancia exacta entre dos corredores concretos (solo la del primero al último)",
+    "nombres, dorsales, clubes o nacionalidades",
+]
+
 CANNOT_CLAIM = [
     "posiciones o puestos de cada corredor",
     "quién va adelante, quién lidera o quién gana",
@@ -32,7 +52,9 @@ CANNOT_CLAIM = [
 ]
 
 
-def build_facts(tracks: TrackingResult, zones: ZonesResult | None) -> dict:
+def build_facts(
+    tracks: TrackingResult, zones: ZonesResult | None, athletes: AthletesResult | None = None
+) -> dict:
     """Hoja de hechos que se le entrega al modelo. Todo en unidades del video."""
     on_screen = [len(f.detections) for f in tracks.frames]
     ordered = sorted(tracks.tracks, key=lambda t: t.n_obs, reverse=True)
@@ -68,7 +90,152 @@ def build_facts(tracks: TrackingResult, zones: ZonesResult | None) -> dict:
         )
     if zones is not None:
         facts["camera"] = _camera_facts(zones)
+    summary = _athlete_facts(athletes, zones) if athletes is not None else None
+    if summary is not None:
+        # Con atletas medidos, los corredores son ellos (sus ids son los que se ven en pantalla)
+        # y el relato puede hablar de puestos y velocidad.
+        facts["athletes"] = summary
+        facts["runners"]["total"] = len(summary["runners"])
+        facts.pop("tracks")
+        facts.pop("tracks_note", None)
+        facts["can_claim"] = CAN_CLAIM_ATHLETES
+        facts["cannot_claim"] = CANNOT_CLAIM_ATHLETES
     return facts
+
+
+def runner_ids(facts: dict) -> set[float]:
+    """Ids que el relato puede nombrar con '#'."""
+    if "athletes" in facts:
+        return {float(r["id"]) for r in facts["athletes"]["runners"]}
+    return {float(t["id"]) for t in facts["tracks"]}
+
+
+KMH = 3.6
+# Un salto mayor entre cuadros medidos es un corte de plano, no una carrera continua.
+MAX_STEP_S = 0.35
+# Muestreo del timeline y separación mínima entre dos adelantamientos del mismo par.
+TIMELINE_EVERY_S = 2.0
+PASS_COOLDOWN_S = 3.0
+MAX_PASSES = 8
+# Debajo de esto, los metros extra por ir por fuera son ruido de medición: no se informan.
+MIN_EXTRA_M = 1.0
+
+
+def _in_curve(s: float) -> bool:
+    lap, c, straight = STANDARD.lap, STANDARD.curve_len, STANDARD.straight
+    u = s % lap
+    return u < c or c + straight <= u < 2 * c + straight
+
+
+def _athlete_facts(athletes: AthletesResult, zones: ZonesResult | None) -> dict | None:
+    """Puestos, velocidad, calles y adelantamientos, ya resumidos para que el modelo narre sin
+    tener que interpretar series de datos."""
+    seen: dict[int, list[tuple[float, AthleteState]]] = {}
+    for frame in athletes.frames:
+        for a in frame.athletes:
+            if a.visible:
+                seen.setdefault(a.id, []).append((frame.t, a))
+    if not seen:
+        return None
+
+    track = STANDARD
+    runners = []
+    for athlete_id, samples in seen.items():
+        extra = 0.0
+        for (t0, a0), (t1, a1) in itertools.pairwise(samples):
+            dx = a1.x - a0.x
+            if t1 - t0 > MAX_STEP_S or dx <= 0 or dx > 3:
+                continue
+            if _in_curve(a1.s):
+                extra += (
+                    dx
+                    * (max(track.meas_offset, a1.d) - track.meas_offset)
+                    / (track.radius + track.meas_offset)
+                )
+        speeds = [a.v for _, a in samples]
+        lane = Counter(a.lane for _, a in samples).most_common(1)[0][0]
+        runners.append(
+            {
+                "id": athlete_id,
+                "in_s": round(samples[0][0], 1),
+                "out_s": round(samples[-1][0], 1),
+                "rank_start": samples[0][1].rank,
+                "rank_end": samples[-1][1].rank,
+                "avg_kmh": round(sum(speeds) / len(speeds) * KMH, 1),
+                "max_kmh": round(max(speeds) * KMH, 1),
+                "lane": lane,
+                "side": "por dentro" if lane == 1 else "por fuera" if lane >= 3 else "en el medio",
+                "extra_m": round(extra, 1) if extra >= MIN_EXTRA_M else None,
+            }
+        )
+    runners.sort(key=lambda r: r["out_s"] - r["in_s"], reverse=True)
+    runners = runners[:MAX_TRACKS_IN_FACTS]
+
+    timeline: list[dict] = []
+    passes: list[dict] = []
+    last_pass: dict[tuple[int, int], float] = {}
+    paces: list[float] = []
+    spreads: list[float] = []
+    next_sample = 0.0
+    prev_rank: dict[int, int] = {}
+    for frame in athletes.frames:
+        visible = [a for a in frame.athletes if a.visible]
+        if visible:
+            mean_v = sum(a.v for a in visible) / len(visible)
+            paces.append(mean_v)
+            spread = max(a.x for a in visible) - min(a.x for a in visible)
+            spreads.append(spread)
+            if frame.t >= next_sample:
+                next_sample = frame.t + TIMELINE_EVERY_S
+                timeline.append(
+                    {
+                        "t_s": round(frame.t, 1),
+                        "leader": min(visible, key=lambda a: a.rank).id,
+                        "pace_kmh": round(mean_v * KMH, 1),
+                        "spread_m": round(spread, 1),
+                        "in_view": len(visible),
+                    }
+                )
+        # Adelantamiento: dos atletas medidos en cuadros seguidos que cambian de orden.
+        now = {a.id: a.rank for a in visible}
+        for a, b in itertools.permutations(now, 2):
+            if (
+                a in prev_rank
+                and b in prev_rank
+                and prev_rank[a] > prev_rank[b]
+                and now[a] < now[b]
+            ):
+                if (
+                    frame.t - last_pass.get((a, b), -1e9) >= PASS_COOLDOWN_S
+                    and len(passes) < MAX_PASSES
+                ):
+                    passes.append({"t_s": round(frame.t, 1), "id": a, "passes": b})
+                last_pass[(a, b)] = frame.t
+        prev_rank = now
+
+    first = timeline[0] if timeline else None
+    last = timeline[-1] if timeline else None
+    outside = [r for r in runners if r["extra_m"] is not None]
+    widest = max(outside, key=lambda r: r["extra_m"]) if outside else None
+    return {
+        "distance_m": round(zones.distance) if zones is not None else None,
+        "field": {
+            "measured": len(seen),
+            "pace_kmh": round(median(paces) * KMH, 1) if paces else 0,
+            "spread_start_m": first["spread_m"] if first else 0,
+            "spread_end_m": last["spread_m"] if last else 0,
+            "leader_start": first["leader"] if first else None,
+            "leader_end": last["leader"] if last else None,
+        },
+        "runners": runners,
+        "timeline": timeline,
+        "passes": passes,
+        "widest": {"id": widest["id"], "extra_m": widest["extra_m"]} if widest else None,
+        "ranks_note": (
+            "rank ordena solo a los atletas medidos en el clip (1 = va primero de ese grupo); "
+            "no es el puesto de la carrera completa."
+        ),
+    }
 
 
 def _camera_facts(zones: ZonesResult) -> dict:

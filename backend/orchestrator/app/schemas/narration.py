@@ -2,6 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.athletes import AthletesResult
 from app.schemas.tracking import TrackingResult
 from app.schemas.zones import ZonesResult
 
@@ -11,6 +12,11 @@ class NarrationRequest(BaseModel):
     zones: ZonesResult | None = Field(
         default=None,
         description="Salida de /api/zones/ (opcional: sin ella no hay relato de cámara)",
+    )
+    athletes: AthletesResult | None = Field(
+        default=None,
+        description="Salida de /api/athletes/ (opcional: con ella el relato habla de puestos, "
+        "velocidad y adelantamientos)",
     )
     style: Literal["transmision", "analisis"] = Field(
         default="transmision", description="Registro del relato"

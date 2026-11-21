@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.cv.race_facts import allowed_numbers, build_facts
 from app.dependencies.common import get_storage
 from app.main import app
+from app.schemas.athletes import AthletesResult
 from app.schemas.narration import NarrationRequest, NarrationSegment
 from app.schemas.tracking import TrackingResult
 from app.schemas.zones import ZonesResult
@@ -110,6 +111,117 @@ def _zones() -> ZonesResult:
             "frames": frames,
         }
     )
+
+
+def _athletes() -> AthletesResult:
+    """Dos atletas: el #2 sale detrás y pasa al #1 hacia los 7 s; el #2 se abre por fuera."""
+    frames = []
+    for i in range(int(DURATION * FPS)):
+        t = round(i / FPS, 3)
+        passed = t >= 7.0
+        x1 = 6.5 * t + 10
+        x2 = 6.9 * t + 4
+        rank1, rank2 = (2, 1) if passed else (1, 2)
+        frames.append(
+            {
+                "frame": i,
+                "t": t,
+                "group": {"x": round(max(x1, x2), 1), "v": 6.7},
+                "measured": True,
+                "athletes": [
+                    {
+                        "id": 1,
+                        "track_id": 4,
+                        "rank": rank1,
+                        "x": round(x1, 2),
+                        "s": round((100 + x1) % 400, 2),
+                        "d": 0.8,
+                        "lane": 1,
+                        "v": 6.5,
+                        "u": -0.2,
+                        "visible": True,
+                        "sigma_x": 0.3,
+                        "bbox": None,
+                    },
+                    {
+                        "id": 2,
+                        "track_id": 8,
+                        "rank": rank2,
+                        "x": round(x2, 2),
+                        "s": round((100 + x2) % 400, 2),
+                        "d": 4.0,
+                        "lane": 3,
+                        "v": 6.9,
+                        "u": 0.2,
+                        "visible": True,
+                        "sigma_x": 0.3,
+                        "bbox": None,
+                    },
+                ],
+            }
+        )
+    return AthletesResult.model_validate({"t0": 0.0, "frames": frames})
+
+
+def test_athlete_facts_have_speed_passes_and_extra_meters() -> None:
+    facts = build_facts(_tracks(), _zones(), _athletes())
+    athletes = facts["athletes"]
+
+    assert "tracks" not in facts  # con atletas, los ids que se nombran son los de los atletas
+    assert facts["runners"]["total"] == 2
+    assert athletes["distance_m"] == 1500
+    by_id = {r["id"]: r for r in athletes["runners"]}
+    assert by_id[2]["max_kmh"] == pytest.approx(6.9 * 3.6, abs=0.1)
+    assert by_id[2]["lane"] == 3 and by_id[1]["lane"] == 1
+    # El que corre por fuera gasta metros de más en la curva; los de adentro, nada que informar.
+    assert by_id[2]["extra_m"] >= 1.0
+    assert by_id[1]["extra_m"] is None
+    assert athletes["widest"]["id"] == 2
+    assert [(p["id"], p["passes"]) for p in athletes["passes"]] == [(2, 1)]
+
+
+def test_athletes_allow_positions_but_never_a_winner(service: NarrationService) -> None:
+    facts = build_facts(_tracks(), _zones(), _athletes())
+    windows = [(0.0, 5.0), (5.0, 10.0), (10.0, 15.0)]
+
+    ok = _segments(
+        windows,
+        [
+            "El #1 va primero del grupo.",
+            "El #2 pasa al #1 y se abre por fuera.",
+            "El #2 cierra la curva.",
+        ],
+    )
+    assert service._validate(ok, windows, facts) is None
+
+    wins = _segments(windows, ["El #1 va primero.", "El #2 pasa al #1.", "El #2 gana la carrera."])
+    problem = service._validate(wins, windows, facts)
+    assert problem is not None and "resultado" in problem
+
+    # Sin atletas, hablar de puestos sigue vedado.
+    plain = build_facts(_tracks(), _zones())
+    problem = service._validate(
+        _segments(windows, ["El #4 va primero.", "Sigue la toma.", "Cierra la toma."]),
+        windows,
+        plain,
+    )
+    assert problem is not None and "resultado" in problem
+
+
+def test_template_with_athletes_stays_valid(service: NarrationService) -> None:
+    facts = build_facts(_tracks(), _zones(), _athletes())
+    windows = service._windows(DURATION, 5.0)
+    segments = service._template_script(facts, windows)
+    assert service._validate(segments, windows, facts) is None
+    assert any("pasa al" in s.text for s in segments)
+
+
+def test_the_prompt_asks_for_calm_and_football_voice() -> None:
+    from app.services.narration_service import SYSTEM_PROMPT
+
+    assert "fútbol" in SYSTEM_PROMPT
+    assert "MAREAR" in SYSTEM_PROMPT
+    assert "UN dato numérico por frase" in SYSTEM_PROMPT
 
 
 def test_facts_summarize_instead_of_dumping_frames() -> None:

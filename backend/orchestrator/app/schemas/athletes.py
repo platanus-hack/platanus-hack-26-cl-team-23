@@ -48,7 +48,9 @@ class GroupInput(BaseModel):
 
 class AthletesRequest(BaseModel):
     source: str = "upload"
-    t0: float = Field(default=0.0, description="Segundo del video del disparo (negativo: ya empezó)")
+    t0: float = Field(
+        default=0.0, description="Segundo del video del disparo (negativo: ya empezó)"
+    )
     field_size: int = Field(default=12, ge=1, le=40, description="Corredores en la serie")
     distance: float = Field(
         default=1500,

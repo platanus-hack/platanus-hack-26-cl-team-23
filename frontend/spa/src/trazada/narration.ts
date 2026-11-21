@@ -17,7 +17,7 @@ export type NarrationStyle = 'transmision' | 'analisis'
 export function generateNarration(race: Race, style: NarrationStyle = 'transmision', signal?: AbortSignal) {
   return apiPost<Narration>(
     '/narration/',
-    { tracks: race.raw.tracks, zones: race.raw.zones, style, segment_s: 8 },
+    { tracks: race.raw.tracks, zones: race.raw.zones, athletes: race.raw.athletes, style, segment_s: 8 },
     { signal },
   )
 }

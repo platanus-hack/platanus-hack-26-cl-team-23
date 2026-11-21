@@ -1095,6 +1095,17 @@
             ],
             "description": "Salida de /api/zones/ (opcional: sin ella no hay relato de c\u00e1mara)"
           },
+          "athletes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AthletesResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Salida de /api/athletes/ (opcional: con ella el relato habla de puestos, velocidad y adelantamientos)"
+          },
           "style": {
             "type": "string",
             "enum": [
