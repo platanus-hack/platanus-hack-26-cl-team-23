@@ -1,5 +1,4 @@
 import { Link, Route, Routes } from 'react-router'
-import About from './pages/About'
 import Home from './pages/Home'
 import NotFound from './pages/NotFound'
 
@@ -21,7 +20,6 @@ function App() {
       <main className="mx-auto max-w-[1280px] px-4 py-6 sm:px-8">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/about" element={<About />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

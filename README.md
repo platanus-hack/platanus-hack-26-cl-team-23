@@ -57,7 +57,7 @@ desplegables juntos en Vercel Services o por separado en GCP.
 
 | Parte | Tecnología |
 |---|---|
-| `frontend/spa` | React 19, Vite 8, TypeScript, Tailwind CSS 4, React Router 8, Zustand, TanStack Query, Bun |
+| `frontend/spa` | React 19, Vite 8, TypeScript, Tailwind CSS 4, React Router 8, Bun |
 | `backend/orchestrator` | FastAPI, Pydantic, Granian, uv, Python 3.13 |
 | Deploy | Vercel Services · Terraform (Cloud Run + App Engine) |
 
@@ -67,11 +67,11 @@ desplegables juntos en Vercel Services o por separado en GCP.
 .
 ├── frontend/spa/               # SPA (Vite)
 │   └── src/
-│       ├── hooks/              # queries (TanStack Query)
-│       ├── lib/                # api + query client
+│       ├── components/trazada/ # video, lista de corredores, vista cenital
+│       ├── lib/                # cliente de la API + query client
 │       ├── pages/
-│       ├── stores/             # Zustand
-│       └── types/
+│       ├── trazada/            # subida, zonas, adaptador y modelo de dibujo
+│       └── types/              # api.gen.ts (generado del OpenAPI)
 ├── backend/orchestrator/       # API (FastAPI)
 │   └── app/
 │       ├── api/                # routers
@@ -127,9 +127,44 @@ cd backend/orchestrator && uv run poe dev                 # http://localhost:808
 | `make test` | Tests del backend |
 | `make lint` | Ruff |
 | `make fmt` | Ruff format |
+| `make types` | Regenera los tipos TS del spa desde el OpenAPI del backend |
 | `make reqs` | Regenera `requirements.txt` para Vercel |
 | `make vercel-dev` | `vercel dev` |
 | `make deploy` | `vercel --prod` |
+
+## Integración front ↔ back
+
+El contrato lo manda el backend: `make types` vuelca su OpenAPI a
+`backend/orchestrator/openapi.json` y genera `frontend/spa/src/types/api.gen.ts`. El front no
+escribe tipos de la API a mano; si un esquema de Pydantic cambia, el build del spa falla.
+`src/trazada/adapter.ts` es la única frontera entre esos tipos y el modelo de dibujo (`Race`).
+
+Al subir un video, el navegador no sube el archivo: saca cuadros a 10 fps y manda solo esos.
+
+```
+extraer cuadros (10 fps, JPEG ≤960 px)
+  ├─ lotes de 24 ─► POST /api/tracking/detect   (cajas, en píxeles del video original)
+  └─ mismos lotes ─► POST /api/zones/features   (evidencia visual del encuadre)
+POST /api/tracking/track   ─► ids estables por corredor (ByteTrack)
+POST /api/zones/           ─► zona Z1..Z6 que enfoca la cámara en cada cuadro
+```
+
+Los dos resultados se unen por el número de cuadro (`frames[].frame`, la posición en la lista
+enviada). Hasta tres lotes viajan en paralelo; si las zonas fallan, la carrera se arma igual
+con el seguimiento. `app/tests/test_frontend_contract.py` verifica esa cadena completa.
+
+La pantalla muestra **solo lo que devuelven esos endpoints**: el video con las cajas y el id
+de cada corredor, la lista de corredores seguidos con sus tiempos y su `on_track`, y la vista
+cenital con el tramo de pista que enfoca la cámara. No hay datos de ejemplo ni simulaciones:
+sin video subido no hay nada que mostrar.
+
+El backend además guarda resultados precomputados (`GET /api/tracking/presets/{name}`,
+`POST /api/tracking/process`, `uv run python -m app.cv.publish_presets`), pero el front no
+los consume.
+
+Lo que todavía no existe es la geometría por corredor (metros sobre la pista, distancia a la
+cuerda, metros extra en la curva): hace falta la homografía por cuadro, que vive en
+`research/trazada` y aún no tiene endpoint. Hasta entonces no se dibuja nada de eso.
 
 ## Variables de entorno
 

@@ -1,0 +1,1258 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Orchestrator API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tracking/detect": {
+      "post": {
+        "tags": [
+          "tracking"
+        ],
+        "summary": "Detect",
+        "description": "Detecci\u00f3n paralela de un lote de frames. Las cajas vuelven en p\u00edxeles del video original.",
+        "operationId": "detect_api_tracking_detect_post",
+        "parameters": [
+          {
+            "name": "x-demo-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_detect_api_tracking_detect_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tracking/track": {
+      "post": {
+        "tags": [
+          "tracking"
+        ],
+        "summary": "Track",
+        "description": "ByteTrack sobre las detecciones acumuladas (sin estado ni llamadas externas).",
+        "operationId": "track_api_tracking_track_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tracking/process": {
+      "post": {
+        "tags": [
+          "tracking"
+        ],
+        "summary": "Process",
+        "description": "Pipeline completo sobre un video de ejemplo o de Blob: detecta, filtra y trackea.",
+        "operationId": "process_api_tracking_process_post",
+        "parameters": [
+          {
+            "name": "x-demo-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tracking/presets/{name}": {
+      "get": {
+        "tags": [
+          "tracking"
+        ],
+        "summary": "Preset",
+        "description": "Resultado precomputado de un video de ejemplo (la demo que no puede fallar).",
+        "operationId": "preset_api_tracking_presets__name__get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tracking/results/{key}": {
+      "get": {
+        "tags": [
+          "tracking"
+        ],
+        "summary": "Result",
+        "description": "Resultado guardado por /process.",
+        "operationId": "result_api_tracking_results__key__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/zones/features": {
+      "post": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "Features",
+        "description": "Evidencia visual por frame (histograma de corte, apariencia, curvatura de l\u00edneas).",
+        "operationId": "features_api_zones_features_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_features_api_zones_features_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneFeaturesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/zones/": {
+      "post": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "Zones",
+        "description": "En qu\u00e9 zona (Z1..Z6) de la pista enfoca la c\u00e1mara en cada frame.",
+        "operationId": "zones_api_zones__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZonesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZonesResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_detect_api_tracking_detect_post": {
+        "properties": {
+          "frames": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Frames",
+            "description": "JPEG/PNG, uno por frame"
+          },
+          "t": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "T",
+            "description": "Segundos de cada frame, mismo orden"
+          },
+          "orig_width": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Orig Width",
+            "description": "Ancho del video original"
+          },
+          "orig_height": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Orig Height",
+            "description": "Alto del video original"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frames",
+          "t",
+          "orig_width",
+          "orig_height"
+        ],
+        "title": "Body_detect_api_tracking_detect_post"
+      },
+      "Body_features_api_zones_features_post": {
+        "properties": {
+          "frames": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Frames",
+            "description": "JPEG/PNG, uno por frame"
+          },
+          "t": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "T",
+            "description": "Segundos de cada frame, mismo orden"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frames",
+          "t"
+        ],
+        "title": "Body_features_api_zones_features_post"
+      },
+      "DetectResponse": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/DetectedFrame"
+            },
+            "type": "array",
+            "title": "Frames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "frames"
+        ],
+        "title": "DetectResponse"
+      },
+      "DetectedFrame": {
+        "properties": {
+          "t": {
+            "type": "number",
+            "title": "T"
+          },
+          "dets": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "maxItems": 6,
+              "minItems": 6
+            },
+            "type": "array",
+            "title": "Dets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t",
+          "dets"
+        ],
+        "title": "DetectedFrame"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "env": {
+            "type": "string",
+            "title": "Env"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "env",
+          "version"
+        ],
+        "title": "HealthResponse"
+      },
+      "PipelineInfo": {
+        "properties": {
+          "detector": {
+            "type": "string",
+            "title": "Detector"
+          },
+          "tracker": {
+            "type": "string",
+            "title": "Tracker"
+          },
+          "min_det_conf": {
+            "type": "number",
+            "title": "Min Det Conf"
+          },
+          "min_on_track": {
+            "type": "number",
+            "title": "Min On Track"
+          },
+          "min_track_on_track": {
+            "type": "number",
+            "title": "Min Track On Track"
+          },
+          "roi": {
+            "anyOf": [
+              {
+                "items": {
+                  "prefixItems": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "type": "array",
+                  "maxItems": 2,
+                  "minItems": 2
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roi"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detector",
+          "tracker",
+          "min_det_conf",
+          "min_on_track",
+          "min_track_on_track"
+        ],
+        "title": "PipelineInfo"
+      },
+      "ProcessRequest": {
+        "properties": {
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Video de ejemplo, p. ej. 'NCCA'"
+          },
+          "blob": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blob",
+            "description": "Ruta en el store, p. ej. 'videos/x.mp4'"
+          },
+          "fps": {
+            "type": "number",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Fps",
+            "default": 15.0
+          }
+        },
+        "type": "object",
+        "title": "ProcessRequest"
+      },
+      "ProcessResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "cached": {
+            "type": "boolean",
+            "title": "Cached"
+          },
+          "result_path": {
+            "type": "string",
+            "title": "Result Path",
+            "description": "Ruta del resultado: GET /api/tracking/results/{key}"
+          },
+          "result_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Url",
+            "description": "URL p\u00fablica directa (Blob)"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrackingResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Resultado en l\u00ednea si es liviano; si no, usar result_url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "cached",
+          "result_path"
+        ],
+        "title": "ProcessResponse"
+      },
+      "TrackFrameInput": {
+        "properties": {
+          "t": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "T",
+            "description": "Segundos dentro del video"
+          },
+          "dets": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "maxItems": 6,
+              "minItems": 6
+            },
+            "type": "array",
+            "title": "Dets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t",
+          "dets"
+        ],
+        "title": "TrackFrameInput"
+      },
+      "TrackRequest": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "upload"
+          },
+          "width": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Height"
+          },
+          "fps_out": {
+            "type": "number",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Fps Out",
+            "default": 15.0
+          },
+          "fps_src": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps Src"
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/TrackFrameInput"
+            },
+            "type": "array",
+            "maxItems": 1500,
+            "minItems": 1,
+            "title": "Frames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "width",
+          "height",
+          "frames"
+        ],
+        "title": "TrackRequest"
+      },
+      "TrackSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "t_start": {
+            "type": "number",
+            "title": "T Start"
+          },
+          "t_end": {
+            "type": "number",
+            "title": "T End"
+          },
+          "n_obs": {
+            "type": "integer",
+            "title": "N Obs"
+          },
+          "on_track": {
+            "type": "number",
+            "title": "On Track"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "t_start",
+          "t_end",
+          "n_obs",
+          "on_track"
+        ],
+        "title": "TrackSummary"
+      },
+      "TrackedDetection": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "bbox": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Bbox"
+          },
+          "foot_px": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Foot Px"
+          },
+          "conf": {
+            "type": "number",
+            "title": "Conf"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "bbox",
+          "foot_px",
+          "conf"
+        ],
+        "title": "TrackedDetection"
+      },
+      "TrackedFrame": {
+        "properties": {
+          "frame": {
+            "type": "integer",
+            "title": "Frame"
+          },
+          "t": {
+            "type": "number",
+            "title": "T"
+          },
+          "detections": {
+            "items": {
+              "$ref": "#/components/schemas/TrackedDetection"
+            },
+            "type": "array",
+            "title": "Detections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frame",
+          "t",
+          "detections"
+        ],
+        "title": "TrackedFrame"
+      },
+      "TrackingResult": {
+        "properties": {
+          "video": {
+            "$ref": "#/components/schemas/VideoInfo"
+          },
+          "pipeline": {
+            "$ref": "#/components/schemas/PipelineInfo"
+          },
+          "tracks": {
+            "items": {
+              "$ref": "#/components/schemas/TrackSummary"
+            },
+            "type": "array",
+            "title": "Tracks"
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/TrackedFrame"
+            },
+            "type": "array",
+            "title": "Frames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "video",
+          "pipeline",
+          "tracks",
+          "frames"
+        ],
+        "title": "TrackingResult"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VideoInfo": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "fps_src": {
+            "type": "number",
+            "title": "Fps Src"
+          },
+          "fps_out": {
+            "type": "number",
+            "title": "Fps Out"
+          },
+          "frames": {
+            "type": "integer",
+            "title": "Frames"
+          },
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "width",
+          "height",
+          "fps_src",
+          "fps_out",
+          "frames",
+          "duration_s"
+        ],
+        "title": "VideoInfo"
+      },
+      "ZoneFeatures": {
+        "properties": {
+          "t": {
+            "type": "number",
+            "title": "T"
+          },
+          "hist": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 128,
+            "minItems": 128,
+            "title": "Hist",
+            "description": "Histograma de color para detectar cortes de plano"
+          },
+          "desc": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 420,
+            "minItems": 420,
+            "title": "Desc",
+            "description": "Descriptor de apariencia (memoria de c\u00e1maras)"
+          },
+          "bend": {
+            "type": "number",
+            "title": "Bend",
+            "description": "Flecha/cuerda de las l\u00edneas pintadas (curvatura)"
+          },
+          "chord": {
+            "type": "number",
+            "title": "Chord",
+            "description": "Largo total de l\u00edneas medidas (px en 1280x720)"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N",
+            "description": "Trazos de l\u00ednea usados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t",
+          "hist",
+          "desc",
+          "bend",
+          "chord",
+          "n"
+        ],
+        "title": "ZoneFeatures"
+      },
+      "ZoneFeaturesInput": {
+        "properties": {
+          "t": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "T",
+            "description": "Segundos dentro del video"
+          },
+          "hist": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 128,
+            "minItems": 128,
+            "title": "Hist"
+          },
+          "desc": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array",
+                "maxItems": 420,
+                "minItems": 420
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desc"
+          },
+          "bend": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bend"
+          },
+          "chord": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chord"
+          },
+          "n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t",
+          "hist"
+        ],
+        "title": "ZoneFeaturesInput",
+        "description": "Features de un frame. `desc` y la curvatura son opcionales: basta con enviarlos cada\n~0,5 s; `hist` hace falta en todos los frames para detectar cortes."
+      },
+      "ZoneFeaturesResponse": {
+        "properties": {
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/ZoneFeatures"
+            },
+            "type": "array",
+            "title": "Frames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frames"
+        ],
+        "title": "ZoneFeaturesResponse"
+      },
+      "ZoneFrame": {
+        "properties": {
+          "frame": {
+            "type": "integer",
+            "title": "Frame",
+            "description": "Posici\u00f3n en la lista enviada (igual que 'frame' de /track)"
+          },
+          "t": {
+            "type": "number",
+            "title": "T"
+          },
+          "zone": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 1.0,
+            "title": "Zone",
+            "description": "Zona que enfoca la c\u00e1mara, con hist\u00e9resis"
+          },
+          "p": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "P",
+            "description": "P(Z1..Z6)"
+          },
+          "s": {
+            "type": "number",
+            "title": "S",
+            "description": "Metros desde la meta del punto enfocado (0-400)"
+          },
+          "x": {
+            "type": "number",
+            "title": "X",
+            "description": "Metros recorridos desde la salida por el punto enfocado"
+          },
+          "x_std": {
+            "type": "number",
+            "title": "X Std"
+          },
+          "v": {
+            "type": "number",
+            "title": "V",
+            "description": "Velocidad del punto enfocado (m/s)"
+          },
+          "cut": {
+            "type": "boolean",
+            "title": "Cut",
+            "description": "True si este frame empieza un plano nuevo"
+          },
+          "recognized": {
+            "type": "boolean",
+            "title": "Recognized",
+            "description": "True si la memoria de c\u00e1maras reconoci\u00f3 el encuadre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frame",
+          "t",
+          "zone",
+          "p",
+          "s",
+          "x",
+          "x_std",
+          "v",
+          "cut",
+          "recognized"
+        ],
+        "title": "ZoneFrame"
+      },
+      "ZonesRequest": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "upload"
+          },
+          "distance": {
+            "type": "number",
+            "maximum": 10000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Distance",
+            "description": "Metros de la prueba (define salida y ritmo)",
+            "default": 1500
+          },
+          "t0": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "T0",
+            "description": "Segundo del video en que suena el disparo (reloj de carrera)",
+            "default": 0.0
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 0
+          },
+          "cut_threshold": {
+            "type": "number",
+            "exclusiveMaximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Cut Threshold",
+            "default": 0.19
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/ZoneFeaturesInput"
+            },
+            "type": "array",
+            "maxItems": 6000,
+            "minItems": 1,
+            "title": "Frames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frames"
+        ],
+        "title": "ZonesRequest"
+      },
+      "ZonesResult": {
+        "properties": {
+          "distance": {
+            "type": "number",
+            "title": "Distance"
+          },
+          "t0": {
+            "type": "number",
+            "title": "T0"
+          },
+          "zone_names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Zone Names"
+          },
+          "cuts": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Cuts"
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/ZoneFrame"
+            },
+            "type": "array",
+            "title": "Frames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "distance",
+          "t0",
+          "zone_names",
+          "cuts",
+          "frames"
+        ],
+        "title": "ZonesResult"
+      }
+    }
+  }
+}

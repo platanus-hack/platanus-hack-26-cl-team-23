@@ -4,12 +4,15 @@ import { fmtNum } from '../../trazada/format'
 import type { Race } from '../../trazada/types'
 import {
   MAX_SECONDS,
+  SAMPLE_FPS,
   UploadError,
   isPlatformLink,
   probeVideo,
   processVideo,
   type Progress,
 } from '../../trazada/upload'
+import { DEFAULT_ZONE_OPTIONS } from '../../trazada/zones'
+import { ApiError } from '../../lib/api'
 
 type State =
   | { kind: 'idle' }
@@ -19,14 +22,31 @@ type State =
 
 type Props = {
   onReady: (race: Race) => void
-  onUseExample: () => void
+}
+
+const PHASE_LABEL: Record<Progress['phase'], string> = {
+  extracting: 'sacando cuadros del video',
+  detecting: 'buscando corredores',
+  tracking: 'siguiendo a cada corredor',
+}
+
+/** Las tres fases pesan distinto: detectar es lo lento (va contra el servidor). */
+const PHASE_RANGE: Record<Progress['phase'], [number, number]> = {
+  extracting: [0, 0.35],
+  detecting: [0.35, 0.95],
+  tracking: [0.95, 1],
+}
+
+function progressPct(p: Progress) {
+  const [from, to] = PHASE_RANGE[p.phase]
+  return from + (to - from) * (p.done / Math.max(1, p.total))
 }
 
 /**
  * Subir un video: arrastrar un archivo o pegar un enlace directo (.mp4).
  * El navegador lo reproduce sin subirlo; solo los cuadros viajan al detector.
  */
-export function UploadPanel({ onReady, onUseExample }: Props) {
+export function UploadPanel({ onReady }: Props) {
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [dragging, setDragging] = useState(false)
   const [link, setLink] = useState('')
@@ -47,25 +67,28 @@ export function UploadPanel({ onReady, onUseExample }: Props) {
           `Dura ${fmtNum(info.duration, 0)} s. Para la demo el tope es ${MAX_SECONDS} s: recórtalo a una sola curva.`,
         )
       }
-      setState({ kind: 'processing', name, src, progress: { done: 0, total: 1 } })
-      const tracks = await processVideo(
+      setState({ kind: 'processing', name, src, progress: { phase: 'extracting', done: 0, total: 1 } })
+      const { tracks, zones } = await processVideo(
         src,
         info,
         (progress) => setState({ kind: 'processing', name, src, progress }),
-        { signal: ctrl.signal },
+        { signal: ctrl.signal, zones: DEFAULT_ZONE_OPTIONS },
       )
       onReady(
-        buildRace(tracks, undefined, {
+        buildRace(tracks, zones, {
           title: name,
           videoUrl: src,
-          note: 'El detector todavía no está conectado: por ahora ves tu video sin corredores.',
+          note:
+            tracks.tracks.length === 0
+              ? 'No encontramos corredores en este video. Prueba con una toma donde se vea la pista completa.'
+              : undefined,
         }),
       )
     } catch (e) {
       if (ctrl.signal.aborted) return
       if (isLocal) URL.revokeObjectURL(src)
       const message =
-        e instanceof UploadError
+        e instanceof UploadError || e instanceof ApiError
           ? e.message
           : isLocal
             ? 'No pudimos leer ese archivo. Prueba con un .mp4 o .mov.'
@@ -98,7 +121,7 @@ export function UploadPanel({ onReady, onUseExample }: Props) {
   }
 
   if (state.kind === 'processing' || state.kind === 'checking') {
-    const pct = state.kind === 'processing' ? state.progress.done / Math.max(1, state.progress.total) : 0
+    const pct = state.kind === 'processing' ? progressPct(state.progress) : 0
     return (
       <section className="rounded-xl border border-line bg-panel p-6" aria-live="polite">
         <div className="flex flex-col gap-6 md:flex-row md:items-center">
@@ -116,7 +139,8 @@ export function UploadPanel({ onReady, onUseExample }: Props) {
                   <div className="h-full rounded-full bg-accent transition-[width] duration-200" style={{ width: `${pct * 100}%` }} />
                 </div>
                 <p className="mt-2 font-mono text-xs text-muted tabular-nums">
-                  cuadro {state.progress.done} de {state.progress.total}
+                  {PHASE_LABEL[state.progress.phase]}
+                  {state.progress.phase !== 'tracking' && ` · cuadro ${state.progress.done} de ${state.progress.total}`}
                 </p>
               </>
             )}
@@ -181,10 +205,7 @@ export function UploadPanel({ onReady, onUseExample }: Props) {
             </div>
           </form>
           <p className="text-sm text-muted">
-            ¿Sin video a mano?{' '}
-            <button type="button" onClick={onUseExample} className="font-semibold text-fg underline underline-offset-4 hover:text-accent">
-              Mira una carrera simulada
-            </button>
+            El video no se sube: el navegador saca {SAMPLE_FPS} cuadros por segundo y solo esos viajan al detector.
           </p>
           {state.kind === 'error' && (
             <p role="alert" className="rounded-md border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-200">

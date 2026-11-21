@@ -1,95 +1,69 @@
-import type { Homography, Vec2 } from './geometry'
+import type { components } from '../types/api.gen'
+import type { Vec2 } from './geometry'
 
 // =====================================================================
-// 1) Formatos de ENTRADA: lo que entregan Andrés y Daniel.
-//    Si el formato cambia, solo se tocan estos tipos y adapter.ts.
+// 1) Contratos de la API. Vienen del OpenAPI del orchestrator (`make types`):
+//    si un esquema cambia en Python, el build del front falla.
 // =====================================================================
 
-/** Andrés · seguimiento de corredores (formato real de NCCA.tracks.json). */
-export type TracksJson = {
-  video: {
-    source: string
-    width: number
-    height: number
-    fps_out: number
-    frames: number
-    duration_s: number
-  }
-  tracks: { id: number; t_start: number; t_end: number; n_obs: number; on_track: number }[]
-  frames: {
-    frame: number
-    t: number
-    detections: {
-      id: number
-      bbox: [number, number, number, number] // x1, y1, x2, y2 en píxeles
-      foot_px: Vec2 // centro de la base de la caja = dónde pisa
-      conf: number
-    }[]
-  }[]
-}
+/** `POST /api/tracking/track` · corredores seguidos (RF-DETR + ByteTrack). */
+export type TrackingResult = components['schemas']['TrackingResult']
+export type DetectResponse = components['schemas']['DetectResponse']
 
-/** Daniel · geometría de la pista (formato PROPUESTO, aún en discusión). */
-export type GeometryJson = {
-  frames: {
-    frame: number
-    t: number
-    zone: number // 1..6: qué tramo de la pista mira la cámara
-    H?: Homography // mundo (m) → imagen (px)
-    runners: {
-      id: number // mismo id que el track de Andrés
-      s: number // metros por la línea de medición desde la meta
-      d: number // distancia lateral a la cuerda
-      v?: number // m/s
-      extra_m: number // metros extra acumulados por ir por fuera
-    }[]
-  }[]
-  summary?: { id: number; start_rank: number; end_rank: number; extra_m: number }[]
-}
+/** `POST /api/zones/` · en qué zona de la pista enfoca la cámara en cada cuadro. */
+export type ZonesResult = components['schemas']['ZonesResult']
 
 // =====================================================================
-// 2) Modelo INTERNO: lo único que conoce el dibujo.
+// 2) Modelo INTERNO: lo único que conoce el dibujo. Todo lo de aquí sale
+//    de los contratos de arriba; no hay datos inventados.
 // =====================================================================
 
 export type RunnerInfo = {
   id: number
-  label: string // lo que se muestra: dorsal o "#id"
+  label: string // "#id"
   color: string
-  hero?: boolean // el corredor que cuenta la historia
-  tStart?: number // primer y último instante en que se le siguió (s)
-  tEnd?: number
+  tStart: number // primer y último instante en que se le siguió (s)
+  tEnd: number
+  nObs: number // cuántas veces se le vio
+  onTrack: number // fracción (0-1) de color pista bajo los pies: qué tan seguro va en pista
 }
 
 export type RunnerSample = {
   id: number
-  bbox?: [number, number, number, number]
-  footPx?: Vec2
-  s?: number
-  d?: number
-  extraM?: number
+  bbox: [number, number, number, number] // x1, y1, x2, y2 en píxeles del video
+  footPx: Vec2 // centro de la base de la caja = dónde pisa
+  conf: number
 }
 
 export type RaceFrame = {
   t: number
-  zone?: number
-  worldToImage?: Homography
   runners: RunnerSample[]
+  /** Zona (1..6) que enfoca la cámara. Solo si se corrió el módulo de zonas. */
+  zone?: number
+  /** Metros desde la meta del punto que enfoca la cámara (0-400). */
+  focusS?: number
+  /** Velocidad del punto enfocado (m/s). */
+  focusV?: number
+  /** Este cuadro empieza un plano nuevo. */
+  cut?: boolean
 }
 
-export type RunnerResult = {
-  id: number
-  startRank: number
-  endRank: number
-  extraM: number
+/** Lectura de la cámara sobre la pista, tal como la entrega /api/zones/. */
+export type CameraRead = {
+  names: Record<number, string> // nombres de las zonas
+  span: [number, number] // tramo de pista (m desde la meta) que recorrió el encuadre
+  cuts: number[] // segundos en que cambia el plano
 }
 
 export type Race = {
-  title: string // "800 m · última curva"
-  note?: string // aviso para quien mira (p. ej. "falta el detector")
-  isMock: boolean
+  title: string
+  note?: string // aviso para quien mira
   video: { width: number; height: number; duration: number; url?: string }
+  /** Qué detector y qué tracker produjeron esto (`pipeline` de /track). */
+  pipeline?: { detector: string; tracker: string }
   runners: RunnerInfo[]
   frames: RaceFrame[] // ordenados por t
-  cameraSpan?: [number, number] // tramo (en s) que cubre la cámara, para resaltarlo en la vista cenital
-  results: RunnerResult[]
-  heroId?: number
+  camera?: CameraRead
+  /** Corredor preseleccionado: el que se siguió por más tiempo. */
+  defaultId?: number
 }

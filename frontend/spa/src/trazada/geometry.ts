@@ -1,4 +1,4 @@
-// Geometría oficial de una pista de 400 m (World Athletics) y utilidades de proyección.
+// Geometría oficial de una pista de 400 m (World Athletics).
 //
 // Sistema de coordenadas "mundo" (metros, vista desde arriba):
 //   - origen en el centro del óvalo, x a lo largo de las rectas, y hacia la recta opuesta.
@@ -15,14 +15,6 @@ export const MEAS = 0.3 // la línea de medición va 0,30 m por fuera de la cuer
 export const CURVE = Math.PI * (R + MEAS) // 115,61 m por curva
 export const STRAIGHT = 84.39 // largo de cada recta
 export const LAP = 2 * CURVE + 2 * STRAIGHT // = 400,0 m
-
-// Tramos en orden de carrera, empezando en la meta.
-export const SEGMENTS = {
-  curve1: [0, CURVE],
-  backStraight: [CURVE, CURVE + STRAIGHT],
-  curve2: [CURVE + STRAIGHT, 2 * CURVE + STRAIGHT],
-  homeStraight: [2 * CURVE + STRAIGHT, LAP],
-} as const
 
 export type Vec2 = [number, number]
 
@@ -47,49 +39,4 @@ export function trackToWorld(s: number, d: number): Vec2 {
   }
   // recta final, hacia +x hasta la meta
   return [-half + (u - 2 * CURVE - STRAIGHT), -r]
-}
-
-export const isCurve = (s: number) => {
-  const u = ((s % LAP) + LAP) % LAP
-  return u < CURVE || (u >= CURVE + STRAIGHT && u < 2 * CURVE + STRAIGHT)
-}
-
-// ---------- Homografía ----------
-// Una homografía es una matriz 3x3 que lleva puntos de un plano a otro plano.
-// Aquí: del suelo de la pista (metros) a la imagen de la cámara (píxeles).
-// Es lo que Daniel calcula por cuadro; con ella podemos dibujar la cuerda encima del video.
-
-export type Homography = [number, number, number, number, number, number, number, number, number]
-
-export function project(H: Homography, x: number, y: number): Vec2 {
-  const w = H[6] * x + H[7] * y + H[8]
-  return [(H[0] * x + H[1] * y + H[2]) / w, (H[3] * x + H[4] * y + H[5]) / w]
-}
-
-/** Resuelve la homografía exacta que lleva 4 puntos src a 4 puntos dst. */
-export function solveHomography(src: Vec2[], dst: Vec2[]): Homography {
-  const A: number[][] = []
-  const b: number[] = []
-  for (let i = 0; i < 4; i++) {
-    const [x, y] = src[i]
-    const [u, v] = dst[i]
-    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y])
-    b.push(u)
-    A.push([0, 0, 0, x, y, 1, -v * x, -v * y])
-    b.push(v)
-  }
-  for (let c = 0; c < 8; c++) {
-    let m = c
-    for (let r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[m][c])) m = r
-    ;[A[c], A[m]] = [A[m], A[c]]
-    ;[b[c], b[m]] = [b[m], b[c]]
-    for (let r = 0; r < 8; r++) {
-      if (r === c) continue
-      const f = A[r][c] / A[c][c]
-      for (let k = c; k < 8; k++) A[r][k] -= f * A[c][k]
-      b[r] -= f * b[c]
-    }
-  }
-  const h = b.map((bi, i) => bi / A[i][i])
-  return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1]
 }

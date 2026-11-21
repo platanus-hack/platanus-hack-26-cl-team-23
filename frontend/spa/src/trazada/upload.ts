@@ -1,35 +1,32 @@
 // Video subido por el usuario (arrastrar un archivo o pegar un enlace).
 //
-// Flujo: revisar duración → sacar cuadros → mandarlos al detector en lotes → armar un
-// TracksJson (el mismo formato de Andrés) → buildRace(). Se procesa ANTES de reproducir,
-// para que en el escenario se vea fluido; igual es causal, cada cuadro solo usa los anteriores.
+// Flujo: revisar duración → sacar cuadros → mandarlos al backend en lotes
+// (POST /api/tracking/detect, y de paso POST /api/zones/features con los MISMOS cuadros)
+// → una sola llamada a POST /api/tracking/track que devuelve el seguimiento con ids.
+// El video nunca se sube: solo viajan los cuadros, ya reescalados.
+//
+// Se procesa ANTES de reproducir, para que en el escenario se vea fluido; igual es
+// causal, cada cuadro solo usa los anteriores.
 
-import type { TracksJson } from './types'
+import { ApiError, apiPost, apiUpload } from '../lib/api'
+import type { DetectResponse, TrackingResult, ZonesResult } from './types'
+import { type ZoneOptions, collectZoneFeatures, resolveZones } from './zones'
 
 /** Tope para la demo: una curva de 115 m a ritmo de medio fondo son ~16 s. */
 export const MAX_SECONDS = 20
 /** Cuadros por segundo que se le mandan al detector. */
 export const SAMPLE_FPS = 10
-/** El backend acepta hasta 24 cuadros por petición. */
+/** El backend acepta hasta 24 cuadros por petición (MAX_BATCH_FRAMES). */
 const BATCH = 24
+/** Lotes en vuelo a la vez. El detector es serverless: en paralelo rinde mucho más. */
+const CONCURRENCY = 3
 /** Ancho máximo del JPEG que viaja al detector (más chico = más rápido). */
 const MAX_FRAME_W = 960
+/** Tope por cuadro del backend (MAX_FRAME_BYTES). */
+const MAX_FRAME_BYTES = 1_500_000
 
 export type VideoInfo = { duration: number; width: number; height: number }
 export type Frame = { index: number; t: number; jpeg: Blob }
-export type Detection = TracksJson['frames'][number]['detections'][number]
-
-/**
- * Detector: recibe un lote de cuadros y devuelve, por cuadro, las cajas en píxeles del
- * video original. AQUÍ se enchufa el de Andrés (POST /api/tracking/detect).
- */
-export type Detector = (frames: Frame[], video: VideoInfo) => Promise<Detection[][]>
-
-/** Detector de mentira mientras Andrés conecta el real: no encuentra a nadie. */
-export const pendingDetector: Detector = async (frames) => {
-  await new Promise((r) => setTimeout(r, 120))
-  return frames.map(() => [])
-}
 
 export class UploadError extends Error {}
 
@@ -75,78 +72,136 @@ async function* extractFrames(src: string, info: VideoInfo, signal?: AbortSignal
       v.currentTime = t
     })
     ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
-    let dataUrl: string
-    try {
-      // toDataURL (síncrono) y no toBlob: el navegador deja toBlob en una cola de baja
-      // prioridad y en la app de escritorio tardaba 1 s por cuadro; así son ~10 ms.
-      dataUrl = canvas.toDataURL('image/jpeg', 0.8)
-    } catch {
-      // El sitio del enlace no permite leer sus cuadros (CORS).
-      throw new UploadError('Ese enlace no deja leer sus cuadros. Descarga el video y arrástralo aquí.')
-    }
-    yield { index: i, t, jpeg: dataUrlToBlob(dataUrl) }
+    let jpeg = encode(canvas, 0.8)
+    // El backend rechaza cuadros de más de 1,5 MB: con un video muy detallado, bajamos calidad.
+    if (jpeg.size > MAX_FRAME_BYTES) jpeg = encode(canvas, 0.5)
+    yield { index: i, t, jpeg }
   }
 }
 
-function dataUrlToBlob(dataUrl: string): Blob {
+function encode(canvas: HTMLCanvasElement, quality: number): Blob {
+  let dataUrl: string
+  try {
+    // toDataURL (síncrono) y no toBlob: el navegador deja toBlob en una cola de baja
+    // prioridad y en la app de escritorio tardaba 1 s por cuadro; así son ~10 ms.
+    dataUrl = canvas.toDataURL('image/jpeg', quality)
+  } catch {
+    // El sitio del enlace no permite leer sus cuadros (CORS).
+    throw new UploadError('Ese enlace no deja leer sus cuadros. Descarga el video y arrástralo aquí.')
+  }
   const [head, b64] = dataUrl.split(',')
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
   return new Blob([bytes], { type: head.slice(5, head.indexOf(';')) })
 }
 
-export type Progress = { done: number; total: number }
+export type Phase = 'extracting' | 'detecting' | 'tracking'
+export type Progress = { phase: Phase; done: number; total: number }
 
-/** Procesa todo el video y devuelve el seguimiento en el formato de Andrés. */
+export type ProcessOptions = {
+  signal?: AbortSignal
+  /** Zonas de la pista: si se omite, no se llama al módulo de zonas. */
+  zones?: ZoneOptions
+}
+
+export type ProcessResult = { tracks: TrackingResult; zones?: ZonesResult }
+
+/** Procesa todo el video contra el backend y devuelve el seguimiento con ids. */
 export async function processVideo(
   src: string,
   info: VideoInfo,
   onProgress: (p: Progress) => void,
-  { detector = pendingDetector, signal }: { detector?: Detector; signal?: AbortSignal } = {},
-): Promise<TracksJson> {
+  { signal, zones }: ProcessOptions = {},
+): Promise<ProcessResult> {
   const total = Math.floor(info.duration * SAMPLE_FPS)
-  const frames: TracksJson['frames'] = []
-  let batch: Frame[] = []
+  if (total < 2) throw new UploadError('El video es demasiado corto para analizarlo.')
 
-  const flush = async () => {
-    if (batch.length === 0) return
-    const dets = await detector(batch, info)
-    batch.forEach((f, i) => frames.push({ frame: f.index, t: f.t, detections: dets[i] ?? [] }))
-    batch = []
-    onProgress({ done: frames.length, total })
-  }
-
-  onProgress({ done: 0, total })
+  // 1) Extraer. Un solo pase: los mismos JPEG alimentan al detector y a las zonas.
+  onProgress({ phase: 'extracting', done: 0, total })
+  const frames: Frame[] = []
   for await (const f of extractFrames(src, info, signal)) {
-    batch.push(f)
-    if (batch.length === BATCH) await flush()
+    frames.push(f)
+    onProgress({ phase: 'extracting', done: frames.length, total })
   }
-  await flush()
   if (signal?.aborted) throw new UploadError('Cancelado')
 
-  return {
-    video: {
-      source: 'subido',
+  // 2) Detectar por lotes, en paralelo.
+  const batches: Frame[][] = []
+  for (let i = 0; i < frames.length; i += BATCH) batches.push(frames.slice(i, i + BATCH))
+
+  let done = 0
+  let zonesOk = zones !== undefined
+  onProgress({ phase: 'detecting', done, total: frames.length })
+  const results = await pool(batches, CONCURRENCY, async (batch) => {
+    const [detected, features] = await Promise.all([
+      retry(() => detectBatch(batch, info, signal)),
+      // Las zonas son un extra: si fallan, la carrera se arma igual con el seguimiento.
+      zones ? retry(() => collectZoneFeatures(batch, signal)).catch(() => undefined) : undefined,
+    ])
+    if (zones && !features) zonesOk = false
+    done += batch.length
+    onProgress({ phase: 'detecting', done, total: frames.length })
+    return { detected, features }
+  })
+  if (signal?.aborted) throw new UploadError('Cancelado')
+
+  // 3) Trackear todo de una vez: ByteTrack necesita la secuencia completa.
+  onProgress({ phase: 'tracking', done: 0, total: 1 })
+  const detectedFrames = results.flatMap((r) => r.detected.frames)
+  const tracks = await apiPost<TrackingResult>(
+    '/tracking/track',
+    {
+      source: 'upload',
       width: info.width,
       height: info.height,
       fps_out: SAMPLE_FPS,
-      frames: frames.length,
-      duration_s: info.duration,
+      frames: detectedFrames.map((f) => ({ t: f.t, dets: f.dets })),
     },
-    tracks: summarizeTracks(frames),
-    frames,
+    { signal },
+  )
+
+  // Solo sirven si están TODOS los lotes: el filtro une zonas y seguimiento por el número
+  // de cuadro, y un hueco correría los índices.
+  const zoneResult =
+    zones && zonesOk
+      ? await resolveZones(results.flatMap((r) => r.features!.frames), zones, signal).catch(() => undefined)
+      : undefined
+
+  onProgress({ phase: 'tracking', done: 1, total: 1 })
+  return { tracks, zones: zoneResult }
+}
+
+function detectBatch(batch: Frame[], info: VideoInfo, signal?: AbortSignal): Promise<DetectResponse> {
+  const form = new FormData()
+  // Las cajas vuelven en píxeles del video original: el backend reescala con orig_*.
+  for (const f of batch) {
+    form.append('frames', f.jpeg, `f${f.index}.jpg`)
+    form.append('t', String(f.t))
+  }
+  form.append('orig_width', String(info.width))
+  form.append('orig_height', String(info.height))
+  return apiUpload<DetectResponse>('/tracking/detect', form, { signal })
+}
+
+/** El detector es serverless: un 502 o un 429 sueltos se reintentan una vez. */
+async function retry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn()
+    } catch (e) {
+      if (i >= attempts || !(e instanceof ApiError) || !e.retryable) throw e
+      await new Promise((r) => setTimeout(r, 400 * i))
+    }
   }
 }
 
-/** Primer y último instante, y cuántas veces se vio, de cada corredor. */
-function summarizeTracks(frames: TracksJson['frames']): TracksJson['tracks'] {
-  const by = new Map<number, { t_start: number; t_end: number; n_obs: number }>()
-  for (const f of frames)
-    for (const d of f.detections) {
-      const tr = by.get(d.id)
-      if (tr) {
-        tr.t_end = f.t
-        tr.n_obs++
-      } else by.set(d.id, { t_start: f.t, t_end: f.t, n_obs: 1 })
-    }
-  return [...by].map(([id, tr]) => ({ id, ...tr, on_track: 1 }))
+/** Ejecuta `fn` sobre todos los items con como máximo `limit` en vuelo, conservando el orden. */
+async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length)
+  let next = 0
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      for (let i = next++; i < items.length; i = next++) out[i] = await fn(items[i])
+    }),
+  )
+  return out
 }
