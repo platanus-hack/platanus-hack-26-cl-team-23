@@ -13,8 +13,10 @@ type Props = {
 }
 
 const BAND = LANES * LANE
-const HALF_W = STRAIGHT / 2 + R + BAND
-const HALF_H = R + BAND
+// Los carriles se dibujan K veces más anchos que en la realidad para distinguir a cada corredor.
+const K = 2.5
+const HALF_W = STRAIGHT / 2 + R + BAND * K
+const HALF_H = R + BAND * K
 
 /**
  * Pista de 400 m vista desde arriba, a escala. Marca el tramo que recorrió el encuadre y
@@ -33,7 +35,7 @@ export function TopView({ race, frameIndex, selectedId }: Props) {
     const ox = size.w / 2
     const oy = size.h / 2
     const toScreen = (x: number, y: number): Vec2 => [ox + x * scale, oy - y * scale]
-    const at = (s: number, d: number) => toScreen(...trackToWorld(s, d))
+    const at = (s: number, d: number) => toScreen(...trackToWorld(s, d * K))
     const lap = range(0, LAP, 0.5)
     const mono = themeFont('mono')
 
@@ -60,7 +62,7 @@ export function TopView({ race, frameIndex, selectedId }: Props) {
     ctx.font = `500 10px ${mono}`
     ctx.fillStyle = themeColor('muted')
     ctx.textAlign = 'center'
-    const [mx, my] = at(0, BAND + 4)
+    const [mx, my] = at(0, BAND + 4 / K)
     const distance = race.raw.zones?.distance
     const s0 = distance === undefined ? undefined : startS(distance)
     const startsAtFinish = s0 !== undefined && (s0 < 0.5 || s0 > LAP - 0.5)
@@ -71,7 +73,7 @@ export function TopView({ race, frameIndex, selectedId }: Props) {
       ctx.strokeStyle = themeColor('fg')
       ctx.lineWidth = 2
       polyline(ctx, [at(s0, 0), at(s0, BAND)])
-      const [lx, ly] = at(s0, BAND + 4)
+      const [lx, ly] = at(s0, BAND + 4 / K)
       ctx.textAlign = 'center'
       ctx.fillText(`SALIDA ${fmtNum(distance ?? 0, 0)} m`, lx, ly + 6)
       ctx.textAlign = 'start'
@@ -103,7 +105,7 @@ export function TopView({ race, frameIndex, selectedId }: Props) {
       ctx.globalAlpha = 0.3
       ctx.lineWidth = 3
       ctx.lineCap = 'round'
-      polyline(ctx, range(a0, a1, 0.5).map((s) => at(s, BAND + 2.6)))
+      polyline(ctx, range(a0, a1, 0.5).map((s) => at(s, BAND + 2.6 / K)))
       ctx.restore()
     }
 

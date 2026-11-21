@@ -123,7 +123,7 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
           <Figure
             title={race.hasAthletes ? 'Dónde está cada atleta' : 'Dónde mira la cámara'}
             flush
-            meta="Pista de 400 m a escala"
+            meta="Pista de 400 m · carriles ensanchados"
           >
             <TopView race={race} frameIndex={fi} selectedId={selectedId} />
             <dl className="grid grid-cols-3 gap-2 px-6 pt-2 pb-6">
