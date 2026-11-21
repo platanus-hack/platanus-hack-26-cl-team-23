@@ -81,10 +81,11 @@ export function CameraView({ race, frameIndex, t, playing, showOverlay, selected
       let y = r.bbox[1] * k - 14
       while (placed.some((p) => Math.abs(p.x - cx) < 44 && Math.abs(p.y - y) < 22)) y -= 22
       placed.push({ x: cx, y })
+      // Elegido: bloque naranja con tinta (5,6:1). Resto: etiqueta blanca con tinta.
       pill(ctx, info.get(r.id)?.label ?? `#${r.id}`, cx, y, {
-        font: `${isSel ? 700 : 500} ${isSel ? 13 : 11}px ${mono}`,
-        color: isSel ? themeColor('hero') : 'rgba(255,255,255,.8)',
-        swatch: isSel ? pick : undefined,
+        font: `${isSel ? 600 : 500} ${isSel ? 13 : 11}px ${mono}`,
+        color: themeColor('fg'),
+        bg: isSel ? pick : themeColor('surface'),
       })
     }
   }, [race, frame, frameIndex, showOverlay, selectedId, size, ref])

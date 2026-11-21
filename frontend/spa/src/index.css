@@ -1,29 +1,276 @@
 @import "tailwindcss";
 
-/* Tokens de color de TRAZADA. Tailwind 4 crea una clase por cada uno:
-   --color-panel → bg-panel, text-panel, border-panel… y los dibujos en canvas
-   los leen como variables CSS, así todo comparte la misma paleta. */
-@theme static {
-  --color-bg: #0e131a;
-  --color-panel: #151c26;
-  --color-line: #253042;
-  --color-fg: #e9eef4;
-  --color-muted: #a9b4c4; /* más claro que antes: pasa contraste 4,5:1 sobre el panel */
-  --color-accent: #ff6b2c;
-  --color-hero: #7dffbf; /* texto del corredor elegido */
-  --color-pick: #3dd68c; /* caja del corredor elegido */
+/* =====================================================================
+   SISTEMA DE DISEÑO DE TRAZADA · "Pista"
+   Disciplina suiza con materiales de Apple. Grilla estricta, mucho aire,
+   tipografía como protagonista (pesos y tamaños con saltos claros, rótulos
+   en mono y mayúsculas), vidrio esmerilado solo sobre lo que flota.
 
-  --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+   REGLAS DE COLOR (es una herramienta de datos: el color es información)
+   - naranja (pick): el corredor elegido y lo que le cuesta. El único color fuerte.
+   - verde (gain) / rojo (loss): puestos ganados / perdidos, solo cuando el dato existe.
+   - grises: todo lo demás. Nunca color decorativo dentro de una sección.
+   - el "cielo" con grano es el único gesto expresivo, y solo en dos lugares
+     (cabecera del resultado y zona de subida).
+
+   Los componentes solo usan tokens. Un modo oscuro futuro = otro bloque de
+   valores para los mismos tokens (:root[data-theme="dark"]), sin tocar componentes.
+   ===================================================================== */
+
+/* ---------- Tokens ----------
+   Tailwind 4 crea una clase por token (--color-line → border-line…) y los
+   dibujos en canvas los leen como variables CSS. */
+@theme static {
+  /* Superficies */
+  --color-bg: #f5f5f7; /* gris de página */
+  --color-surface: #ffffff; /* secciones */
+  --color-paper2: #f5f5f7; /* zonas dentro de una sección: curvas, bloques de cifra */
+  --color-line: #e5e5ea; /* divisiones */
+
+  /* Texto */
+  --color-fg: #1d1d1f;
+  --color-muted: #6e6e73; /* 5,1:1 sobre blanco */
+
+  /* Datos */
+  --color-pick: #ff5b14; /* el corredor elegido: trazos y marcas (3,1:1 como gráfico) */
+  --color-hero: #c2410c; /* el elegido como TEXTO (5,2:1) */
+  --color-band: #ffd8c4; /* costo de ir por fuera (franja) */
+  --color-other: #8e8e93; /* el resto de los corredores: 3,3:1, legible como línea */
+  --color-gain: #1a7f37; /* puestos ganados (texto 5,1:1) */
+  --color-loss: #d70015; /* puestos perdidos (texto 5,6:1) */
+
+  /* Acción */
+  --color-accent: #0071e3; /* botones, enlaces, foco: 4,6:1 con blanco */
+
+  /* Pista: carriles en grises alternados, como un mapa */
+  --color-lane-1: #e8e8ed;
+  --color-lane-2: #dedee3;
+  --color-lane-3: #e8e8ed;
+  --color-lane-4: #dedee3;
+  --color-lane-5: #e8e8ed;
+  --color-lane-6: #dedee3;
+  --color-lane-7: #e8e8ed;
+  --color-lane-8: #dedee3;
+  --color-trackline: #ffffff;
+  --color-grass: #f5f5f7;
+
+  /* Tipografía: la de sistema de Apple (Inter si no está) + Geist Mono para rótulos y medidas */
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Escala cerrada: 12 · 14 · 16 · 20 · 24 · 32 · 48 · 64 · 96 */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.35;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.45;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.25;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 1.2;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 1.1;
+  --text-4xl: 3rem;
+  --text-4xl--line-height: 1.04;
+  --text-5xl: 4rem;
+  --text-5xl--line-height: 1;
+  --text-6xl: 6rem;
+  --text-6xl--line-height: 0.95;
+
+  /* Radios */
+  --radius-ui: 980px; /* botones tipo píldora */
+  --radius-section: 22px; /* secciones */
+  --radius-inner: 14px; /* dentro de una sección: video, campos, avisos, filas */
 }
 
+/* ---------- Roles: qué tamaño, peso y caja toma cada papel ---------- */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  --h1-size: var(--text-5xl);
+  --h1-weight: 700;
+  --h1-tracking: -0.035em;
+  --title-size: var(--text-xl);
+  --title-weight: 600;
+  --title-tracking: -0.015em;
+  --hero-size: var(--text-6xl);
+  --hero-weight: 700;
+  --hero-tracking: -0.04em;
+  --lead-size: var(--text-4xl); /* cifra destacada dentro de una columna */
+  --stat-size: var(--text-3xl);
+  --stat-weight: 600;
+  /* Rótulo: mono, mayúsculas chicas con aire */
+  --label-font: var(--font-mono);
+  --label-size: 0.6875rem; /* 11 px */
+  --label-weight: 500;
+  --label-tracking: 0.08em;
+  /* Sección */
+  --head-pad: 20px 24px 0;
+  --body-pad: 16px 24px 24px;
+  --section-gap: 20px;
+  /* Vidrio esmerilado: solo para lo que flota (barra superior, rótulos sobre el video) */
+  --glass-bg: rgb(255 255 255 / 0.72);
+  --glass-blur: saturate(180%) blur(20px);
+  /* Cielo con grano */
+  --sky: radial-gradient(120% 90% at 50% 115%, #ff5b14 0%, #ffa36b 32%, #f6c9a8 50%, #b9b8e6 74%, #8e9be0 100%);
+  --grain-opacity: 0.35;
+  /* Movimiento: una curva para todo (salida exponencial) */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (max-width: 640px) {
+  :root {
+    --h1-size: var(--text-4xl);
+    --hero-size: var(--text-5xl);
+    --head-pad: 16px 16px 0;
+    --body-pad: 12px 16px 16px;
+  }
 }
 
 body {
   background: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- Roles tipográficos ---------- */
+.h1 {
+  font-family: var(--font-display);
+  font-size: var(--h1-size);
+  line-height: 1;
+  font-weight: var(--h1-weight);
+  letter-spacing: var(--h1-tracking);
+  text-wrap: balance;
+}
+.title {
+  font-family: var(--font-display);
+  font-size: var(--title-size);
+  line-height: 1.25;
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-tracking);
+}
+.hero-number {
+  font-family: var(--font-display);
+  /* nunca más ancha que su tarjeta: como máximo 28 % del ancho del contenedor */
+  font-size: min(var(--hero-size), 28cqi);
+  line-height: 0.95;
+  font-weight: var(--hero-weight);
+  letter-spacing: var(--hero-tracking);
+  white-space: nowrap;
+}
+.lead-number {
+  font-family: var(--font-display);
+  font-size: var(--lead-size);
+  line-height: 1;
+  font-weight: var(--hero-weight);
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+}
+.stat-number {
+  font-family: var(--font-display);
+  font-size: var(--stat-size);
+  line-height: 1.05;
+  font-weight: var(--stat-weight);
+  letter-spacing: -0.025em;
+}
+
+/* ---------- Reglas de arquitectura ----------
+   Toda la pantalla se arma con UNA pieza: la sección (.fig):
+   cabecera (.fig-head) con título y dato de contexto + cuerpo (.fig-body). */
+.fig {
+  container-type: inline-size; /* las cifras se miden contra su sección, no contra la pantalla */
+  min-width: 0;
+  background: var(--color-surface);
+  border-radius: var(--radius-section);
+  overflow: hidden;
+}
+.fig-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: var(--head-pad);
+}
+.fig-body {
+  padding: var(--body-pad);
+}
+.fig-body--flush {
+  padding: 0;
+  margin-top: 16px;
+}
+
+/* Tarjeta de dato suelta (las cifras de "Por qué importa") */
+.tile {
+  container-type: inline-size;
+  background: var(--color-surface);
+  border-radius: var(--radius-section);
+}
+
+/* Bloque de cifra: campo gris neutro dentro de una sección */
+.bento {
+  border-radius: var(--radius-inner);
+  background: var(--color-paper2);
+}
+
+/* Cielo con grano: degradado + ruido fino encima (el ruido es un SVG en línea) */
+.sky {
+  position: relative;
+  background: var(--sky);
+}
+.sky::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Línea vertical delgada: título | contexto */
+.rule-v {
+  border-left: 1px solid var(--color-line);
+}
+
+/* Vidrio esmerilado: solo sobre algo que pasa por debajo */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+/* Rótulo: el texto más chico del sistema */
+@utility label {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  line-height: 1.35;
+  font-weight: var(--label-weight);
+  text-transform: uppercase;
+  letter-spacing: var(--label-tracking);
+}
+
+/* ---------- Superficies del navegador también llevan el sistema ---------- */
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+:focus-visible {
+  outline-color: var(--color-accent);
+}
+input[type="range"] {
+  accent-color: var(--color-accent);
+}
+button,
+a,
+input,
+label {
+  touch-action: manipulation; /* sin el retardo del doble toque */
+  -webkit-tap-highlight-color: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }
