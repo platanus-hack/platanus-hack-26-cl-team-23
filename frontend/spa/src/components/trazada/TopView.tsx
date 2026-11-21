@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { LANE, LANES, LAP, R, STRAIGHT, trackToWorld, type Vec2 } from '../../trazada/geometry'
 import { polyline, range } from '../../trazada/draw'
 import { fmtNum, themeColor, themeFont } from '../../trazada/format'
+import { startS } from '../../trazada/pruebas'
 import type { Race } from '../../trazada/types'
 import { useCanvas } from '../../trazada/useCanvas'
 
@@ -60,7 +61,21 @@ export function TopView({ race, frameIndex, selectedId }: Props) {
     ctx.fillStyle = themeColor('muted')
     ctx.textAlign = 'center'
     const [mx, my] = at(0, BAND + 4)
-    ctx.fillText('META', mx, my + 6)
+    const distance = race.raw.zones?.distance
+    const s0 = distance === undefined ? undefined : startS(distance)
+    const startsAtFinish = s0 !== undefined && (s0 < 0.5 || s0 > LAP - 0.5)
+    ctx.fillText(startsAtFinish ? 'META · SALIDA' : 'META', mx, my + 6)
+
+    // Línea de salida de la prueba: de ahí parte el grupo.
+    if (s0 !== undefined && !startsAtFinish) {
+      ctx.strokeStyle = themeColor('fg')
+      ctx.lineWidth = 2
+      polyline(ctx, [at(s0, 0), at(s0, BAND)])
+      const [lx, ly] = at(s0, BAND + 4)
+      ctx.textAlign = 'center'
+      ctx.fillText('SALIDA', lx, ly + 6)
+      ctx.textAlign = 'start'
+    }
 
     // Medidas oficiales, discretas
     ctx.font = `500 10px ${mono}`
@@ -81,19 +96,19 @@ export function TopView({ race, frameIndex, selectedId }: Props) {
 
     // Tramo que recorrió el encuadre durante todo el video: arco de tinta por fuera.
     // (El naranja queda reservado para el corredor elegido.)
-    if (race.camera) {
-      const [s0, s1] = race.camera.span
+    if (race.camera && !race.hasAthletes) {
+      const [a0, a1] = race.camera.span
       ctx.save()
       ctx.strokeStyle = themeColor('fg')
       ctx.globalAlpha = 0.3
       ctx.lineWidth = 3
       ctx.lineCap = 'round'
-      polyline(ctx, range(s0, s1, 0.5).map((s) => at(s, BAND + 2.6)))
+      polyline(ctx, range(a0, a1, 0.5).map((s) => at(s, BAND + 2.6)))
       ctx.restore()
     }
 
     // Dónde mira la cámara en este instante.
-    if (frame?.focusS !== undefined) {
+    if (frame?.focusS !== undefined && !race.hasAthletes) {
       const [x, y] = at(frame.focusS, BAND / 2)
       ctx.save()
       ctx.fillStyle = themeColor('fg')

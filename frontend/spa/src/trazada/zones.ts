@@ -21,8 +21,6 @@ export type ZoneOptions = {
   t0: number
 }
 
-export const DEFAULT_ZONE_OPTIONS: ZoneOptions = { distance: 1500, t0: 0 }
-
 /** La apariencia y la curvatura solo hacen falta cada ~0,5 s; el histograma, en todos. */
 const DESC_EVERY_S = 0.5
 

@@ -759,9 +759,8 @@
           },
           "t0": {
             "type": "number",
-            "minimum": 0.0,
             "title": "T0",
-            "description": "Segundo del video del disparo",
+            "description": "Segundo del video del disparo (negativo: ya empez\u00f3)",
             "default": 0.0
           },
           "field_size": {
@@ -1965,9 +1964,8 @@
           },
           "t0": {
             "type": "number",
-            "minimum": 0.0,
             "title": "T0",
-            "description": "Segundo del video en que suena el disparo (reloj de carrera)",
+            "description": "Segundo del video en que suena el disparo (reloj de carrera). Negativo si el clip empieza con la carrera ya en marcha.",
             "default": 0.0
           },
           "seed": {

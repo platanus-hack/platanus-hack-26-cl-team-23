@@ -48,7 +48,7 @@ class GroupInput(BaseModel):
 
 class AthletesRequest(BaseModel):
     source: str = "upload"
-    t0: float = Field(default=0.0, ge=0, description="Segundo del video del disparo")
+    t0: float = Field(default=0.0, description="Segundo del video del disparo (negativo: ya empezó)")
     field_size: int = Field(default=12, ge=1, le=40, description="Corredores en la serie")
     frames: list[AthleteFrameFeatures] = Field(min_length=1, max_length=6000)
     group: list[GroupInput] = Field(min_length=1, max_length=6000)

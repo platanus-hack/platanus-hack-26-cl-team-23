@@ -11,7 +11,7 @@ import {
   type Progress,
 } from '../../trazada/upload'
 import { DEFAULT_ATHLETE_OPTIONS } from '../../trazada/athletes'
-import { DEFAULT_ZONE_OPTIONS } from '../../trazada/zones'
+import { DEFAULT_DISTANCE, PRUEBAS, describeStart } from '../../trazada/pruebas'
 import { ApiError } from '../../lib/api'
 import { Button, Figure, TrackMark } from './ui'
 
@@ -53,6 +53,8 @@ export function UploadPanel({ onReady }: Props) {
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [dragging, setDragging] = useState(false)
   const [link, setLink] = useState('')
+  const [distance, setDistance] = useState(DEFAULT_DISTANCE)
+  const [shot, setShot] = useState('0')
   const input = useRef<HTMLInputElement>(null)
   const abort = useRef<AbortController | null>(null)
 
@@ -70,12 +72,19 @@ export function UploadPanel({ onReady }: Props) {
           `Dura ${fmtNum(info.duration, 0)} s. Para la demo el tope es ${MAX_SECONDS} s: recórtalo a una sola curva.`,
         )
       }
+      // El disparo se escribe con coma o punto; si no es un número, se toma como el inicio del clip.
+      const t0 = Number.parseFloat(shot.replace(',', '.'))
+      const gun = Number.isFinite(t0) ? t0 : 0
       setState({ kind: 'processing', name, src, progress: { phase: 'extracting', done: 0, total: 1 } })
       const { tracks, zones, athletes } = await processVideo(
         src,
         info,
         (progress) => setState({ kind: 'processing', name, src, progress }),
-        { signal: ctrl.signal, zones: DEFAULT_ZONE_OPTIONS, athletes: DEFAULT_ATHLETE_OPTIONS },
+        {
+          signal: ctrl.signal,
+          zones: { distance, t0: gun },
+          athletes: { ...DEFAULT_ATHLETE_OPTIONS, t0: gun },
+        },
       )
       onReady(
         buildRace(tracks, zones, athletes, {
@@ -148,7 +157,49 @@ export function UploadPanel({ onReady }: Props) {
   }
 
   return (
-    <Figure title="Sube el video de una curva">
+    <Figure title="Sube el video de una carrera">
+      {/* 0. Qué prueba es: de ahí sale el punto de partida en la pista */}
+      <div className="mb-6 grid gap-4 md:max-w-2xl md:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <label htmlFor="prueba" className="text-sm font-semibold">
+            ¿Qué prueba es?
+          </label>
+          <select
+            id="prueba"
+            value={distance}
+            onChange={(e) => setDistance(Number(e.target.value))}
+            aria-describedby="prueba-help"
+            className="min-h-11 rounded-inner border border-line bg-surface px-3 text-base focus-visible:border-accent focus-visible:outline-2"
+          >
+            {PRUEBAS.map((p) => (
+              <option key={p.distance} value={p.distance}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <p id="prueba-help" className="text-sm text-muted">
+            {describeStart(distance)}
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label htmlFor="disparo" className="text-sm font-semibold">
+            Segundo del disparo en el video
+          </label>
+          <input
+            id="disparo"
+            type="text"
+            inputMode="decimal"
+            value={shot}
+            onChange={(e) => setShot(e.target.value)}
+            aria-describedby="disparo-help"
+            className="min-h-11 rounded-inner border border-line bg-surface px-3 text-base tabular-nums focus-visible:border-accent focus-visible:outline-2"
+          />
+          <p id="disparo-help" className="text-sm text-muted">
+            0 si el video parte con la salida. Si la carrera ya iba, los segundos que habían pasado, con signo menos (−40).
+          </p>
+        </div>
+      </div>
+
       {/* 1. Archivo: la caja trae sus propias reglas */}
       <button
         type="button"

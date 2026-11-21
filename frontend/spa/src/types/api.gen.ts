@@ -364,7 +364,7 @@ export interface components {
             source: string;
             /**
              * T0
-             * @description Segundo del video del disparo
+             * @description Segundo del video del disparo (negativo: ya empezó)
              * @default 0
              */
             t0: number;
@@ -887,7 +887,7 @@ export interface components {
             distance: number;
             /**
              * T0
-             * @description Segundo del video en que suena el disparo (reloj de carrera)
+             * @description Segundo del video en que suena el disparo (reloj de carrera). Negativo si el clip empieza con la carrera ya en marcha.
              * @default 0
              */
             t0: number;

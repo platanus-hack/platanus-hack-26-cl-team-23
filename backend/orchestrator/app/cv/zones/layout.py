@@ -21,7 +21,10 @@ NAMES = {
 
 # Velocidad media plausible por prueba (m/s, final de campeonato masculino, rango amplio).
 PACE = {
+    200: (8.8, 10.8),
+    400: (8.0, 9.8),
     800: (6.9, 7.9),
+    1000: (6.5, 7.6),
     1500: (6.3, 7.1),
     1609: (6.2, 7.0),
     3000: (5.9, 6.6),

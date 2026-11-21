@@ -40,8 +40,10 @@ class ZonesRequest(BaseModel):
     )
     t0: float = Field(
         default=0.0,
-        ge=0,
-        description="Segundo del video en que suena el disparo (reloj de carrera)",
+        description=(
+            "Segundo del video en que suena el disparo (reloj de carrera). "
+            "Negativo si el clip empieza con la carrera ya en marcha."
+        ),
     )
     seed: int = 0
     cut_threshold: float = Field(default=0.19, gt=0, lt=1)

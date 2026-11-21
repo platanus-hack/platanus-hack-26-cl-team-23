@@ -53,11 +53,20 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
   const selected = race.runners.find((r) => r.id === selectedId)
   const zone = frame?.zone !== undefined ? (race.camera?.names[frame.zone] ?? `Zona ${frame.zone}`) : undefined
 
+  // Atletas medidos en este cuadro: ritmo medio y cuántos metros separan al primero del último.
+  const seenNow = (frame?.athletes ?? []).filter((a) => a.visible)
+  const meanV = seenNow.reduce((sum, a) => sum + a.v, 0) / Math.max(1, seenNow.length)
+  const spread = seenNow.length ? Math.max(...seenNow.map((a) => a.x)) - Math.min(...seenNow.map((a) => a.x)) : 0
+
   const facts = [
     race.title,
     race.pipeline ? `${race.pipeline.detector} + ${race.pipeline.tracker}` : undefined,
     `${fmtSeconds(race.video.duration)} · ${race.frames.length} cuadros`,
-    race.camera ? `Tramo ${fmtNum(race.camera.span[0], 0)}–${fmtNum(race.camera.span[1], 0)} m` : undefined,
+    race.hasAthletes && race.raw.zones
+      ? `Prueba ${fmtNum(race.raw.zones.distance, 0)} m`
+      : race.camera
+        ? `Tramo ${fmtNum(race.camera.span[0], 0)}–${fmtNum(race.camera.span[1], 0)} m`
+        : undefined,
   ].filter((f): f is string => !!f)
 
   return (
@@ -118,9 +127,19 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
           >
             <TopView race={race} frameIndex={fi} selectedId={selectedId} />
             <dl className="grid grid-cols-3 gap-2 px-6 pt-2 pb-6">
-              <Stat term="Tramo enfocado" value={`${fmtNum(race.camera.span[0], 0)}–${fmtNum(race.camera.span[1], 0)} m`} />
-              <Stat term="Cambios de plano" value={`${race.camera.cuts.length}`} />
-              <Stat term="Barrido" value={frame?.focusV !== undefined ? `${fmtNum(frame.focusV, 1)} m/s` : '—'} />
+              {race.hasAthletes ? (
+                <>
+                  <Stat term="Atletas medidos" value={`${seenNow.length} de ${race.runners.length}`} />
+                  <Stat term="Ritmo del grupo" value={seenNow.length ? `${fmtNum(meanV, 1)} m/s` : '—'} />
+                  <Stat term="Primero a último" value={seenNow.length > 1 ? `${fmtNum(spread, 0)} m` : '—'} />
+                </>
+              ) : (
+                <>
+                  <Stat term="Tramo enfocado" value={`${fmtNum(race.camera.span[0], 0)}–${fmtNum(race.camera.span[1], 0)} m`} />
+                  <Stat term="Cambios de plano" value={`${race.camera.cuts.length}`} />
+                  <Stat term="Barrido" value={frame?.focusV !== undefined ? `${fmtNum(frame.focusV, 1)} m/s` : '—'} />
+                </>
+              )}
             </dl>
           </Figure>
         )}
