@@ -21,6 +21,7 @@ const PALETTE = ['#e5484d', '#f5c542', '#9b6cf2', '#4c8dff', '#3dd68c', '#ff8bd1
 
 export type RaceMeta = {
   title: string
+  note?: string
   isMock?: boolean
   videoUrl?: string
   cameraSpan?: [number, number]
@@ -71,6 +72,7 @@ export function buildRace(tracks: TracksJson, geometry: GeometryJson | undefined
 
   return {
     title: meta.title,
+    note: meta.note,
     isMock: meta.isMock ?? false,
     video: { width: tracks.video.width, height: tracks.video.height, duration: tracks.video.duration_s, url: meta.videoUrl },
     runners: runners.map((r) => ({ ...r, hero: r.id === heroId })),

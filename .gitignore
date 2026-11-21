@@ -118,3 +118,6 @@ backend/orchestrator/app/assets/
 research/
 trazada.html
 .claude/settings.local.json
+
+# Video de ejemplo NCCA: solo local para desarrollar el front (Andrés lo sirve desde el backend)
+frontend/spa/public/demo/

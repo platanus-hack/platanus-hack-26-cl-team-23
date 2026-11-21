@@ -11,7 +11,7 @@ import type { GeometryJson, TracksJson } from '../types'
 
 export async function load(): Promise<{ tracks: TracksJson; geometry?: GeometryJson; meta: RaceMeta }> {
   const res = await fetch(tracksUrl)
-  if (!res.ok) throw new Error(`No se pudo leer el seguimiento de Andrés (${res.status})`)
+  if (!res.ok || !res.headers.get('content-type')?.includes('json')) throw new Error('el ejemplo NCCA solo está en el computador de desarrollo por ahora (frontend/spa/public/demo)')
   const tracks = (await res.json()) as TracksJson
   return {
     tracks,

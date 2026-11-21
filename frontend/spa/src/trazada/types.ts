@@ -84,6 +84,7 @@ export type RunnerResult = {
 
 export type Race = {
   title: string // "800 m · última curva"
+  note?: string // aviso para quien mira (p. ej. "falta el detector")
   isMock: boolean
   video: { width: number; height: number; duration: number; url?: string }
   runners: RunnerInfo[]

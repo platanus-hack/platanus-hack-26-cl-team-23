@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router'
 import { CameraView } from '../components/trazada/CameraView'
 import { BalanceChart } from '../components/trazada/BalanceChart'
 import { Leaderboard, ResultCard, RunnerStats } from '../components/trazada/ResultCard'
+import { UploadPanel } from '../components/trazada/UploadPanel'
 import { RunnerTelemetry } from '../components/trazada/RunnerTelemetry'
 import { TopView } from '../components/trazada/TopView'
 import { frameAt, loadRace, type RaceSource } from '../trazada/adapter'
@@ -12,26 +13,103 @@ import { fmtSeconds } from '../trazada/format'
 import type { Race } from '../trazada/types'
 import { usePlayback } from '../trazada/usePlayback'
 
+type Source = RaceSource | 'subir'
+
 /** Pantalla principal de TRAZADA. */
 export default function Home() {
-  // La fuente va en la URL (?fuente=simulacion) para poder compartir un link directo a cada modo.
+  // La fuente va en la URL (?fuente=…) para poder compartir un link directo a cada modo.
   const [params, setParams] = useSearchParams()
-  const source: RaceSource = params.get('fuente') === 'simulacion' ? 'simulacion' : 'real'
-  const setSource = (s: RaceSource) => setParams(s === 'real' ? {} : { fuente: s })
+  const raw = params.get('fuente')
+  const source: Source = raw === 'simulacion' || raw === 'subir' ? raw : 'real'
+  const setSource = (s: Source) => setParams(s === 'real' ? {} : { fuente: s })
+  // El video subido vive solo en memoria: no se puede poner en la URL.
+  const [uploaded, setUploaded] = useState<Race | null>(null)
+  const replaceUpload = (race: Race | null) => {
+    if (uploaded?.video.url?.startsWith('blob:')) URL.revokeObjectURL(uploaded.video.url)
+    setUploaded(race)
+  }
 
   // TanStack Query cachea cada fuente por separado: cambiar de modo y volver es instantáneo.
   const { data: race, isPending, isError, error } = useQuery({
     queryKey: ['race', source],
-    queryFn: () => loadRace(source),
+    queryFn: () => loadRace(source as RaceSource),
+    enabled: source !== 'subir',
   })
 
+  if (source === 'subir') {
+    if (uploaded)
+      return <RaceScreen key={uploaded.video.url} race={uploaded} source={source} onSource={setSource} onNewUpload={() => replaceUpload(null)} />
+    return (
+      <div className="flex flex-col gap-6">
+        <SourceBar title="Analiza tu carrera" subtitle="Sube el video de una curva y TRAZADA sigue a cada corredor." source={source} onSource={setSource} />
+        <UploadPanel onReady={replaceUpload} onUseExample={() => setSource('real')} />
+      </div>
+    )
+  }
   if (isPending) return <p className="text-muted">Cargando carrera…</p>
   if (isError) return <p className="text-red-400">No se pudo cargar la carrera: {error.message}</p>
   // key: al cambiar de fuente, la pantalla parte de cero (tiempo, corredor elegido…)
   return <RaceScreen key={source} race={race} source={source} onSource={setSource} />
 }
 
-function RaceScreen({ race, source, onSource }: { race: Race; source: RaceSource; onSource: (s: RaceSource) => void }) {
+const SOURCES: [Source, string][] = [
+  ['subir', 'Tu video'],
+  ['real', 'Ejemplo NCCA'],
+  ['simulacion', 'Simulación'],
+]
+
+function SourceBar({
+  title,
+  subtitle,
+  source,
+  onSource,
+  action,
+}: {
+  title: string
+  subtitle: string
+  source: Source
+  onSource: (s: Source) => void
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+      <div className="min-w-0">
+        <h1 className="font-display text-[32px] leading-none font-extrabold">{title}</h1>
+        <p className="mt-1 text-sm text-muted">{subtitle}</p>
+      </div>
+      <div className="ml-auto flex flex-wrap items-center gap-3">
+        {action}
+        <div role="group" aria-label="Fuente de datos" className="inline-flex rounded-lg border border-line p-0.5">
+          {SOURCES.map(([value, text]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onSource(value)}
+              aria-pressed={source === value}
+              className={`min-h-9 rounded-md px-3 text-sm font-semibold transition-colors ${
+                source === value ? 'bg-accent text-bg' : 'text-muted hover:text-fg'
+              } focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RaceScreen({
+  race,
+  source,
+  onSource,
+  onNewUpload,
+}: {
+  race: Race
+  source: Source
+  onSource: (s: Source) => void
+  onNewUpload?: () => void
+}) {
   const { t, playing, toggle, seek } = usePlayback(race.video.duration)
   const [overlay, setOverlay] = useState(true)
   const [ghost, setGhost] = useState(true)
@@ -47,37 +125,28 @@ function RaceScreen({ race, source, onSource }: { race: Race; source: RaceSource
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Barra de la carrera: qué estamos viendo y de dónde salen los datos */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="min-w-0">
-          <h1 className="font-display text-[32px] leading-none font-extrabold">{race.title}</h1>
-          <p className="mt-1 text-sm text-muted">
-            {source === 'real'
-              ? 'Corredores seguidos en el video con RF-DETR + ByteTrack'
-              : 'Carrera simulada · todos los datos son inventados'}
-          </p>
-        </div>
-        <div role="group" aria-label="Fuente de datos" className="ml-auto inline-flex rounded-lg border border-line p-0.5">
-          {(
-            [
-              ['real', 'Video real'],
-              ['simulacion', 'Simulación'],
-            ] as const
-          ).map(([value, text]) => (
+      <SourceBar
+        title={race.title}
+        subtitle={
+          race.note ??
+          (source === 'real'
+            ? 'Corredores seguidos en el video con RF-DETR + ByteTrack'
+            : 'Carrera simulada · todos los datos son inventados')
+        }
+        source={source}
+        onSource={onSource}
+        action={
+          onNewUpload && (
             <button
-              key={value}
               type="button"
-              onClick={() => onSource(value)}
-              aria-pressed={source === value}
-              className={`min-h-9 rounded-md px-3 text-sm font-semibold transition-colors ${
-                source === value ? 'bg-accent text-bg' : 'text-muted hover:text-fg'
-              } focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+              onClick={onNewUpload}
+              className="min-h-9 rounded-md border border-line px-3 text-sm font-semibold text-fg hover:border-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              {text}
+              Subir otro video
             </button>
-          ))}
-        </div>
-      </div>
+          )
+        }
+      />
 
       {/* Fila 1: video + resultado y posiciones */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -142,8 +211,8 @@ function RaceScreen({ race, source, onSource }: { race: Race; source: RaceSource
             <ResultCard race={race} selectedId={selectedId} series={selSeries} />
           ) : (
             <Pending title="Resultado de la curva">
-              Ya seguimos a cada corredor en el video. Cuando llegue la ubicación en la pista (en metros), aquí aparece
-              cuántos puestos ganó y cuántos metros extra corrió.
+              Cuando TRAZADA ubique a cada corredor en la pista (en metros), aquí aparece cuántos puestos ganó y
+              cuántos metros extra corrió.
             </Pending>
           )}
           <Leaderboard race={race} frameIndex={fi} selectedId={selectedId} onSelect={setSelectedId} />
