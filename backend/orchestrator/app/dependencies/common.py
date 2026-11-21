@@ -10,6 +10,7 @@ from app.clients.storage import Storage, build_storage
 from app.core.config import Settings, settings
 from app.core.domain_errors import AuthenticationError
 from app.cv.detector import RoboflowDetector
+from app.services.athletes_service import AthletesService
 from app.services.tracking_service import TrackingService
 from app.services.zones_service import ZonesService
 
@@ -49,6 +50,10 @@ def get_tracking_service(
 
 def get_zones_service() -> ZonesService:
     return ZonesService()
+
+
+def get_athletes_service() -> AthletesService:
+    return AthletesService()
 
 
 def require_demo_key(x_demo_key: Annotated[str | None, Header()] = None) -> None:

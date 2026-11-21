@@ -357,10 +357,378 @@
           }
         }
       }
+    },
+    "/api/athletes/features": {
+      "post": {
+        "tags": [
+          "athletes"
+        ],
+        "summary": "Features",
+        "description": "Medici\u00f3n por frame: posici\u00f3n de cada corredor relativa al grupo y al bordillo.",
+        "operationId": "features_api_athletes_features_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_features_api_athletes_features_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AthleteFeaturesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/athletes/": {
+      "post": {
+        "tags": [
+          "athletes"
+        ],
+        "summary": "Athletes",
+        "description": "Posici\u00f3n y velocidad de cada atleta respecto a la cancha (grupo + relativo al grupo).",
+        "operationId": "athletes_api_athletes__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AthletesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AthletesResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AthleteFeaturesResponse": {
+        "properties": {
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/AthleteFrameFeatures"
+            },
+            "type": "array",
+            "title": "Frames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frames"
+        ],
+        "title": "AthleteFeaturesResponse"
+      },
+      "AthleteFrameFeatures": {
+        "properties": {
+          "t": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "T",
+            "description": "Segundos dentro del video"
+          },
+          "u_img": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "U Img",
+            "description": "Direcci\u00f3n de imagen sobre la que se midi\u00f3 ds (None: sin geometr\u00eda)"
+          },
+          "head_on": {
+            "type": "boolean",
+            "title": "Head On",
+            "description": "La pista se aleja de la c\u00e1mara (ds es profundidad)"
+          },
+          "blind": {
+            "type": "boolean",
+            "title": "Blind",
+            "description": "Primer plano sin geometr\u00eda confiable: no hay medici\u00f3n"
+          },
+          "bg_shift": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bg Shift",
+            "description": "Movimiento del fondo (px) desde el frame anterior del mismo lote"
+          },
+          "runners": {
+            "items": {
+              "$ref": "#/components/schemas/RunnerFeatures"
+            },
+            "type": "array",
+            "title": "Runners"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t",
+          "u_img",
+          "head_on",
+          "blind",
+          "bg_shift",
+          "runners"
+        ],
+        "title": "AthleteFrameFeatures"
+      },
+      "AthleteState": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Atleta (estable a trav\u00e9s de cortes de plano)"
+          },
+          "track_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Track Id",
+            "description": "id del tracker de imagen en este frame, si se ve"
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank",
+            "description": "Puesto entre los atletas vistos en los \u00faltimos 3 s"
+          },
+          "x": {
+            "type": "number",
+            "title": "X",
+            "description": "Metros recorridos desde la salida"
+          },
+          "s": {
+            "type": "number",
+            "title": "S",
+            "description": "Metros desde la meta en sentido de carrera (0-400)"
+          },
+          "d": {
+            "type": "number",
+            "title": "D",
+            "description": "Metros al bordillo"
+          },
+          "lane": {
+            "type": "integer",
+            "title": "Lane",
+            "description": "Calle (1 = la de adentro)"
+          },
+          "v": {
+            "type": "number",
+            "title": "V",
+            "description": "Velocidad respecto a la cancha (m/s)"
+          },
+          "u": {
+            "type": "number",
+            "title": "U",
+            "description": "Velocidad relativa al grupo (m/s)"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible"
+          },
+          "sigma_x": {
+            "type": "number",
+            "title": "Sigma X",
+            "description": "Incertidumbre de x relativa al grupo (m)"
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "track_id",
+          "rank",
+          "x",
+          "s",
+          "d",
+          "lane",
+          "v",
+          "u",
+          "visible",
+          "sigma_x",
+          "bbox"
+        ],
+        "title": "AthleteState"
+      },
+      "AthletesFrame": {
+        "properties": {
+          "frame": {
+            "type": "integer",
+            "title": "Frame",
+            "description": "Posici\u00f3n en la lista enviada (igual que /track y /zones)"
+          },
+          "t": {
+            "type": "number",
+            "title": "T"
+          },
+          "group": {
+            "$ref": "#/components/schemas/GroupOutput"
+          },
+          "measured": {
+            "type": "boolean",
+            "title": "Measured",
+            "description": "Hubo geometr\u00eda para medir en este frame"
+          },
+          "athletes": {
+            "items": {
+              "$ref": "#/components/schemas/AthleteState"
+            },
+            "type": "array",
+            "title": "Athletes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frame",
+          "t",
+          "group",
+          "measured",
+          "athletes"
+        ],
+        "title": "AthletesFrame"
+      },
+      "AthletesRequest": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "upload"
+          },
+          "t0": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "T0",
+            "description": "Segundo del video del disparo",
+            "default": 0.0
+          },
+          "field_size": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 1.0,
+            "title": "Field Size",
+            "description": "Corredores en la serie",
+            "default": 12
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/AthleteFrameFeatures"
+            },
+            "type": "array",
+            "maxItems": 6000,
+            "minItems": 1,
+            "title": "Frames"
+          },
+          "group": {
+            "items": {
+              "$ref": "#/components/schemas/GroupInput"
+            },
+            "type": "array",
+            "maxItems": 6000,
+            "minItems": 1,
+            "title": "Group"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frames",
+          "group"
+        ],
+        "title": "AthletesRequest"
+      },
+      "AthletesResult": {
+        "properties": {
+          "t0": {
+            "type": "number",
+            "title": "T0"
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/AthletesFrame"
+            },
+            "type": "array",
+            "title": "Frames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t0",
+          "frames"
+        ],
+        "title": "AthletesResult"
+      },
       "Body_detect_api_tracking_detect_post": {
         "properties": {
           "frames": {
@@ -401,6 +769,63 @@
           "orig_height"
         ],
         "title": "Body_detect_api_tracking_detect_post"
+      },
+      "Body_features_api_athletes_features_post": {
+        "properties": {
+          "frames": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Frames",
+            "description": "JPEG/PNG, uno por frame, consecutivos"
+          },
+          "t": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "T",
+            "description": "Segundos de cada frame, mismo orden"
+          },
+          "boxes": {
+            "type": "string",
+            "title": "Boxes",
+            "description": "JSON por frame: [[id, x1, y1, x2, y2], ...] (salida de /track)"
+          },
+          "orig_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orig Width",
+            "description": "Ancho del video original"
+          },
+          "orig_height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orig Height",
+            "description": "Alto del video original"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frames",
+          "t",
+          "boxes"
+        ],
+        "title": "Body_features_api_athletes_features_post"
       },
       "Body_features_api_zones_features_post": {
         "properties": {
@@ -475,6 +900,50 @@
           "dets"
         ],
         "title": "DetectedFrame"
+      },
+      "GroupInput": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X",
+            "description": "Metros recorridos por la cabeza de carrera ('x' de /zones)"
+          },
+          "v": {
+            "type": "number",
+            "title": "V",
+            "description": "Su velocidad ('v' de /zones)"
+          },
+          "cut": {
+            "type": "boolean",
+            "title": "Cut",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "v"
+        ],
+        "title": "GroupInput",
+        "description": "Una fila de la salida de /zones para el mismo frame."
+      },
+      "GroupOutput": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X"
+          },
+          "v": {
+            "type": "number",
+            "title": "V"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "v"
+        ],
+        "title": "GroupOutput"
       },
       "HTTPValidationError": {
         "properties": {
@@ -652,6 +1121,98 @@
           "result_path"
         ],
         "title": "ProcessResponse"
+      },
+      "RunnerFeatures": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "id del tracker de imagen (/track)"
+          },
+          "bbox": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Bbox",
+            "description": "[x1, y1, x2, y2] en p\u00edxeles del video original"
+          },
+          "foot": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Foot"
+          },
+          "ds": {
+            "type": "number",
+            "title": "Ds",
+            "description": "m relativo al centro del grupo, en el sentido de u_img"
+          },
+          "sigma_ds": {
+            "type": "number",
+            "title": "Sigma Ds"
+          },
+          "d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "D",
+            "description": "m al bordillo (None si no se pudo medir)"
+          },
+          "sigma_d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sigma D"
+          },
+          "jersey": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array",
+                "maxItems": 48,
+                "minItems": 48
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jersey",
+            "description": "Color de camiseta (re-identificaci\u00f3n tras cortes)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "bbox",
+          "foot",
+          "ds",
+          "sigma_ds",
+          "d",
+          "sigma_d",
+          "jersey"
+        ],
+        "title": "RunnerFeatures"
       },
       "TrackFrameInput": {
         "properties": {
