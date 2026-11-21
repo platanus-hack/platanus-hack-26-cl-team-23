@@ -1,0 +1,7 @@
+ultralytics>=8.4
+lap
+opencv-python
+numpy
+websockets
+pytest
+scipy
