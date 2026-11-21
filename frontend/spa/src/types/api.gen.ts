@@ -304,7 +304,7 @@ export interface components {
             x: number;
             /**
              * S
-             * @description Metros desde la meta en sentido de carrera (0-400)
+             * @description Metros desde la meta en sentido de carrera (0-400), contando desde la salida de la prueba
              */
             s: number;
             /**
@@ -374,6 +374,12 @@ export interface components {
              * @default 12
              */
             field_size: number;
+            /**
+             * Distance
+             * @description Metros de la prueba: define dónde está la salida (el mismo de /zones)
+             * @default 1500
+             */
+            distance: number;
             /** Frames */
             frames: components["schemas"]["AthleteFrameFeatures"][];
             /** Group */

@@ -24,6 +24,7 @@ from app.cv.athletes.measure import (
     motion_gray,
 )
 from app.cv.athletes.tracker import AthleteTracker, stable_order
+from app.cv.zones.layout import start_s
 from app.cv.zones.track import STANDARD
 
 
@@ -60,6 +61,7 @@ class GroupState:
 class AthleteParams:
     t0: float = 0.0
     field_size: int = 12
+    distance: float = 1500  # m de la prueba: la salida está `distance` m antes de la meta
     min_bg_dt: float = 0.25  # s: más separados que esto, el desplazamiento del fondo no sirve
 
 
@@ -116,6 +118,7 @@ def run(
     sigue, así que el fondo se mueve al revés). De frente, adelante es hacia la cámara.
     """
     tracker = AthleteTracker(field_size=params.field_size)
+    s0 = start_s(params.distance)
     frames_out: list[dict] = []
     fwd: np.ndarray | None = None
     prev_feet: dict[int, np.ndarray] = {}
@@ -179,7 +182,7 @@ def run(
                         "track_id": a.tid if a.id in live_ids else None,
                         "rank": k + 1,
                         "x": round(a.x, 2),
-                        "s": round(a.x % STANDARD.lap, 2),
+                        "s": round((s0 + a.x) % STANDARD.lap, 2),
                         "d": round(a.d, 2),
                         "lane": lane_of(a.d),
                         "v": round(g.v + a.u, 2),

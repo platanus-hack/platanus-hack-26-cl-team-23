@@ -50,6 +50,12 @@ class AthletesRequest(BaseModel):
     source: str = "upload"
     t0: float = Field(default=0.0, description="Segundo del video del disparo (negativo: ya empezó)")
     field_size: int = Field(default=12, ge=1, le=40, description="Corredores en la serie")
+    distance: float = Field(
+        default=1500,
+        gt=0,
+        le=10000,
+        description="Metros de la prueba: define dónde está la salida (el mismo de /zones)",
+    )
     frames: list[AthleteFrameFeatures] = Field(min_length=1, max_length=6000)
     group: list[GroupInput] = Field(min_length=1, max_length=6000)
 
@@ -59,7 +65,9 @@ class AthleteState(BaseModel):
     track_id: int | None = Field(description="id del tracker de imagen en este frame, si se ve")
     rank: int = Field(description="Puesto entre los atletas vistos en los últimos 3 s")
     x: float = Field(description="Metros recorridos desde la salida")
-    s: float = Field(description="Metros desde la meta en sentido de carrera (0-400)")
+    s: float = Field(
+        description="Metros desde la meta en sentido de carrera (0-400), contando desde la salida de la prueba"
+    )
     d: float = Field(description="Metros al bordillo")
     lane: int = Field(description="Calle (1 = la de adentro)")
     v: float = Field(description="Velocidad respecto a la cancha (m/s)")

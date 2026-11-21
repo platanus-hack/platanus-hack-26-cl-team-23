@@ -73,7 +73,7 @@ export function TopView({ race, frameIndex, selectedId }: Props) {
       polyline(ctx, [at(s0, 0), at(s0, BAND)])
       const [lx, ly] = at(s0, BAND + 4)
       ctx.textAlign = 'center'
-      ctx.fillText('SALIDA', lx, ly + 6)
+      ctx.fillText(`SALIDA ${fmtNum(distance ?? 0, 0)} m`, lx, ly + 6)
       ctx.textAlign = 'start'
     }
 

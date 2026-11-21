@@ -83,7 +83,7 @@ export function UploadPanel({ onReady }: Props) {
         {
           signal: ctrl.signal,
           zones: { distance, t0: gun },
-          athletes: { ...DEFAULT_ATHLETE_OPTIONS, t0: gun },
+          athletes: { ...DEFAULT_ATHLETE_OPTIONS, t0: gun, distance },
         },
       )
       onReady(

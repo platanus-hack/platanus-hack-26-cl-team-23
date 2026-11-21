@@ -198,6 +198,16 @@ def test_pipeline_forward_from_motion_and_ranks() -> None:
     assert all(abs(a["v"] - 6.6) < 0.5 for a in last)
 
 
+def test_s_counts_from_the_start_line_of_the_race() -> None:
+    feats = _synthetic_features()
+    group = [pipeline.GroupState(x=200 + 6.6 * (f.t - 10.0), v=6.6) for f in feats]
+    # 1500 m: la salida está 100 m después de la meta; 800 m: sale en la meta
+    for distance, s0 in ((1500, 100.0), (800, 0.0)):
+        out = pipeline.run(feats, group, pipeline.AthleteParams(distance=distance))
+        lead = out[-1]["athletes"][0]
+        assert abs(lead["s"] - ((s0 + lead["x"]) % 400)) < 0.05
+
+
 def _jpeg(img: np.ndarray) -> bytes:
     ok, buffer = cv2.imencode(".jpg", img)
     assert ok

@@ -17,9 +17,11 @@ export type AthleteOptions = {
   fieldSize: number
   /** Segundo del video en que suena el disparo (el mismo que usan las zonas). */
   t0: number
+  /** Metros de la prueba: de ahí sale el punto de partida de los atletas en la pista. */
+  distance: number
 }
 
-export const DEFAULT_ATHLETE_OPTIONS: AthleteOptions = { fieldSize: 12, t0: 0 }
+export const DEFAULT_ATHLETE_OPTIONS: AthleteOptions = { fieldSize: 12, t0: 0, distance: 1500 }
 
 /** Cuadros por petición: más chico que el de detección porque cada cuadro viaja otra vez. */
 export const ATHLETE_BATCH = 12
@@ -61,6 +63,7 @@ export function resolveAthletes(
       source: 'upload',
       t0: options.t0,
       field_size: options.fieldSize,
+      distance: options.distance,
       frames: features,
       group: zones.frames.map((z) => ({ x: z.x, v: z.v, cut: z.cut })),
     },

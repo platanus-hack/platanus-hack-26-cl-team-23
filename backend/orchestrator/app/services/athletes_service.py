@@ -147,6 +147,8 @@ class AthletesService:
             for f in request.frames
         ]
         group = [pipeline.GroupState(x=g.x, v=g.v, cut=g.cut) for g in request.group]
-        params = pipeline.AthleteParams(t0=request.t0, field_size=request.field_size)
+        params = pipeline.AthleteParams(
+            t0=request.t0, field_size=request.field_size, distance=request.distance
+        )
         frames = await asyncio.to_thread(pipeline.run, features, group, params)
         return AthletesResult(t0=request.t0, frames=frames)
