@@ -183,7 +183,7 @@ export function UploadPanel({ onReady, onUseExample }: Props) {
           <p className="text-sm text-muted">
             ¿Sin video a mano?{' '}
             <button type="button" onClick={onUseExample} className="font-semibold text-fg underline underline-offset-4 hover:text-accent">
-              Mira la carrera de ejemplo
+              Mira una carrera simulada
             </button>
           </p>
           {state.kind === 'error' && (

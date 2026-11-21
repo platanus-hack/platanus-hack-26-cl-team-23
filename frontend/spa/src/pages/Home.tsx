@@ -20,8 +20,9 @@ export default function Home() {
   // La fuente va en la URL (?fuente=…) para poder compartir un link directo a cada modo.
   const [params, setParams] = useSearchParams()
   const raw = params.get('fuente')
-  const source: Source = raw === 'simulacion' || raw === 'subir' ? raw : 'real'
-  const setSource = (s: Source) => setParams(s === 'real' ? {} : { fuente: s })
+  // Por defecto se abre "Tu video": es el flujo principal del producto.
+  const source: Source = raw === 'simulacion' || raw === 'real' ? raw : 'subir'
+  const setSource = (s: Source) => setParams(s === 'subir' ? {} : { fuente: s })
   // El video subido vive solo en memoria: no se puede poner en la URL.
   const [uploaded, setUploaded] = useState<Race | null>(null)
   const replaceUpload = (race: Race | null) => {
@@ -34,6 +35,7 @@ export default function Home() {
     queryKey: ['race', source],
     queryFn: () => loadRace(source as RaceSource),
     enabled: source !== 'subir',
+    retry: 1, // si el archivo no existe, no tiene sentido esperar 3 reintentos
   })
 
   if (source === 'subir') {
@@ -42,12 +44,48 @@ export default function Home() {
     return (
       <div className="flex flex-col gap-6">
         <SourceBar title="Analiza tu carrera" subtitle="Sube el video de una curva y TRAZADA sigue a cada corredor." source={source} onSource={setSource} />
-        <UploadPanel onReady={replaceUpload} onUseExample={() => setSource('real')} />
+        <UploadPanel onReady={replaceUpload} onUseExample={() => setSource('simulacion')} />
       </div>
     )
   }
   if (isPending) return <p className="text-muted">Cargando carrera…</p>
-  if (isError) return <p className="text-red-400">No se pudo cargar la carrera: {error.message}</p>
+  if (isError)
+    return (
+      <div className="flex flex-col gap-6">
+        <SourceBar
+          title={source === 'real' ? 'Ejemplo NCCA' : 'Simulación'}
+          subtitle="Esta carrera no está disponible por ahora."
+          source={source}
+          onSource={setSource}
+        />
+        <section className="rounded-xl border border-dashed border-line bg-panel/60 p-6">
+          <h2 className="text-sm font-semibold">No pudimos cargar esta carrera</h2>
+          <p className="mt-2 max-w-prose text-sm text-muted">
+            {source === 'real'
+              ? 'El video de ejemplo todavía no está publicado en este sitio. Mientras tanto, sube tu propio video o mira la carrera simulada.'
+              : error.message}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setSource('subir')}
+              className="min-h-10 rounded-md bg-accent px-4 text-sm font-semibold text-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              Subir un video
+            </button>
+            {source !== 'simulacion' && (
+              <button
+                type="button"
+                onClick={() => setSource('simulacion')}
+                className="min-h-10 rounded-md border border-line px-4 text-sm font-semibold hover:border-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                Ver la simulación
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
+    )
   // key: al cambiar de fuente, la pantalla parte de cero (tiempo, corredor elegido…)
   return <RaceScreen key={source} race={race} source={source} onSource={setSource} />
 }
