@@ -1,11 +1,11 @@
 // DATOS REALES · video NCCA de Andrés + su seguimiento (RF-DETR + ByteTrack).
 //
-// Se leen directo desde backend/orchestrator/app/assets: Vite los sirve en desarrollo
-// y los copia al build. Falta la geometría de Daniel: cuando exista su JSON,
+// Son archivos estáticos del front (public/demo/): así la demo no depende del backend
+// ni del almacenamiento de Andrés (los presets viven ahora en Vercel Blob). Falta la geometría de Daniel: cuando exista su JSON,
 // se importa aquí igual y se pasa como segundo argumento de buildRace().
 
-import videoUrl from '../../../../../backend/orchestrator/app/assets/NCCA.mp4?url'
-import tracksUrl from '../../../../../backend/orchestrator/app/assets/out/NCCA.tracks.json?url'
+const videoUrl = '/demo/NCCA.mp4'
+const tracksUrl = '/demo/NCCA.tracks.json'
 import type { RaceMeta } from '../adapter'
 import type { GeometryJson, TracksJson } from '../types'
 
