@@ -84,7 +84,7 @@ class Settings:
         self.anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5").strip()
         self.eleven_labs_api_key: str = os.getenv("ELEVEN_LABS_API_KEY", "").strip()
         self.eleven_labs_voice_id: str = os.getenv(
-            "ELEVEN_LABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"
+            "ELEVEN_LABS_VOICE_ID", "ClNifCEVq1smkl4M3aTk"
         ).strip()
         self.eleven_labs_model: str = os.getenv("ELEVEN_LABS_MODEL", "eleven_v4").strip()
 
