@@ -1,5 +1,4 @@
-import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,7 +18,7 @@ Point = tuple[float, float]
 class TrackingParams:
     fps_out: float = 15.0
     min_det_conf: float = 0.2
-    min_on_track: float = 0.35
+    min_on_track: float = 0.2
     min_track_on_track: float = 0.65
     roi: list[Point] | None = None
     lost_track_buffer: int = 30
@@ -36,23 +35,21 @@ class VideoMeta:
     width: int
     height: int
     fps_src: float
-    frames_src: int
-
-    @property
-    def duration_s(self) -> float:
-        return self.frames_src / self.fps_src
+    duration_s: float
 
 
 def read_meta(video_path: Path) -> VideoMeta:
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise FileNotFoundError(f"No se pudo abrir el video: {video_path}")
+    fps_src = cap.get(cv2.CAP_PROP_FPS)
+    frames_src = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     meta = VideoMeta(
         source=video_path.name,
         width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
         height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-        fps_src=cap.get(cv2.CAP_PROP_FPS),
-        frames_src=int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+        fps_src=fps_src,
+        duration_s=frames_src / fps_src if fps_src else 0.0,
     )
     cap.release()
     return meta
@@ -60,7 +57,7 @@ def read_meta(video_path: Path) -> VideoMeta:
 
 def sample_indices(meta: VideoMeta, fps_out: float) -> list[int]:
     stride = max(1, round(meta.fps_src / fps_out))
-    return list(range(0, meta.frames_src, stride))
+    return list(range(0, int(meta.duration_s * meta.fps_src) + 1, stride))
 
 
 def iter_frames(
@@ -85,6 +82,12 @@ def iter_frames(
         cap.release()
 
 
+def score_frame(frame: np.ndarray, detections: list[list[float]]) -> list[list[float]]:
+    """[x1,y1,x2,y2,conf] -> [x1,y1,x2,y2,conf,on_track] para un frame suelto."""
+    hsv = to_hsv(frame)
+    return [[*d[:5], round(on_track_fraction(hsv, d), 3)] for d in detections]
+
+
 def score_on_track(
     video_path: Path, indices: list[int], detections: list[list[list[float]]]
 ) -> list[list[list[float]]]:
@@ -92,48 +95,29 @@ def score_on_track(
 
     Pasada local sobre el video (sin llamadas a la API), por eso no se cachea.
     """
-    scored: list[list[list[float]]] = []
-    for frame, dets in zip(iter_frames(video_path, indices, []), detections, strict=True):
-        hsv = to_hsv(frame)
-        scored.append([[*d[:5], round(on_track_fraction(hsv, d), 3)] for d in dets])
-    return scored
+    frames = iter_frames(video_path, indices, [])
+    return [score_frame(f, d) for f, d in zip(frames, detections, strict=True)]
 
 
 def detect_video(
     video_path: Path,
     detector: RoboflowDetector,
     fps_out: float,
-    cache_dir: Path | None = None,
-    use_cache: bool = True,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> tuple[VideoMeta, list[int], list[list[list[float]]]]:
-    """Detecta personas en los frames muestreados. Cachea en disco para no gastar créditos."""
+    """Detecta personas en los frames muestreados: devuelve meta, índices leídos y [x1,y1,x2,y2,conf].
+
+    Sin caché: quien llama decide si guardar las detecciones (cuestan créditos de la API).
+    """
     meta = read_meta(video_path)
     wanted = sample_indices(meta, fps_out)
-    cache_file = cache_dir / f"{video_path.stem}.detections.json" if cache_dir else None
-    cache_key = {"model": detector.model_id, "fps_out": fps_out, "source_frames": meta.frames_src}
-
-    if use_cache and cache_file and cache_file.exists():
-        cached = json.loads(cache_file.read_text())
-        if cached.get("key") == cache_key:
-            logger.info("Detecciones desde caché: %s", cache_file)
-            return (
-                meta,
-                cached["indices"],
-                score_on_track(video_path, cached["indices"], cached["detections"]),
-            )
-
     logger.info("Detectando ~%d frames de %s ...", len(wanted), video_path.name)
     read_indices: list[int] = []
     detections = detector.detect_many(
         iter_frames(video_path, wanted, read_indices),
-        on_progress=lambda n: logger.info("  %d/%d frames", n, len(wanted)),
+        on_progress=(lambda n: on_progress(n, len(wanted))) if on_progress else None,
     )
-    if cache_file:
-        cache_file.parent.mkdir(parents=True, exist_ok=True)
-        cache_file.write_text(
-            json.dumps({"key": cache_key, "indices": read_indices, "detections": detections})
-        )
-    return meta, read_indices, score_on_track(video_path, read_indices, detections)
+    return meta, read_indices, detections
 
 
 def _in_roi(roi: np.ndarray | None, point: Point) -> bool:
@@ -159,12 +143,16 @@ def _on_track_of(box: np.ndarray, candidates: np.ndarray) -> float:
 
 def track(
     meta: VideoMeta,
-    indices: list[int],
+    frame_ids: list[int],
+    times: list[float],
     raw_detections: list[list[list[float]]],
     params: TrackingParams,
     model_id: str = "",
 ) -> dict:
-    """Aplica ROI + ByteTrack sobre detecciones crudas y arma el JSON del contrato."""
+    """Aplica ByteTrack sobre detecciones [x1,y1,x2,y2,conf,on_track] y arma el JSON del contrato.
+
+    times son segundos dentro del video; frame_ids identifican cada cuadro muestreado.
+    """
     roi = np.array(params.roi, dtype=np.int32) if params.roi else None
     tracker = ByteTrackTracker(
         lost_track_buffer=params.lost_track_buffer,
@@ -178,8 +166,8 @@ def track(
     frames_out: list[dict] = []
     spans: dict[int, dict] = {}
 
-    for idx, dets in zip(indices, raw_detections, strict=True):
-        t = round(idx / meta.fps_src, 3)
+    for idx, t_raw, dets in zip(frame_ids, times, raw_detections, strict=True):
+        t = round(t_raw, 3)
         kept = [
             d
             for d in dets

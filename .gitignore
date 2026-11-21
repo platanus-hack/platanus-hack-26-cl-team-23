@@ -106,3 +106,6 @@ tmp/
 *.bak
 .vercel
 .env*
+
+# Artefactos de depuración del pipeline de tracking (se regeneran con app.cv.cli)
+*.tracked.mp4

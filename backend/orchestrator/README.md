@@ -33,6 +33,30 @@ El archivo `.env` se carga automáticamente al iniciar la app (`app/core/config.
 
 - `GET /api/health` → estado de la API
 
+### Tracking (`/api/tracking`, ver `/docs`)
+
+| Ruta | Para qué |
+|---|---|
+| `POST /detect` | Detección **paralela** de un lote de frames (multipart: `frames` JPEG, `t` en segundos, `orig_width`, `orig_height`; máx. 24 frames y 4,5 MB por petición). Devuelve `[x1,y1,x2,y2,conf,on_track]` por frame, en píxeles del video original |
+| `POST /track` | ByteTrack sin estado sobre las detecciones acumuladas (JSON `frames:[{t, dets}]`) → JSON del contrato |
+| `POST /process` | Pipeline **completo** sobre `{"source":"NCCA"}` o `{"blob":"videos/x.mp4"}` (máx. 40 s). Cachea por hash del video |
+| `GET /presets/{name}` | Resultado precomputado de un video de ejemplo (`NCCA`) |
+| `GET /results/{key}` | Resultado guardado por `/process` |
+
+`/detect` y `/process` gastan créditos de Roboflow: si `DEMO_ACCESS_KEY` está definida exigen el
+header `X-Demo-Key`. Las variables `ROBOFLOW_*`, `BLOB_*` y `STORAGE_BACKEND` son opcionales al
+arrancar (ver `.env.example`).
+
+**Almacenamiento:** Vercel Blob (`BLOB_STORE_ID` + token OIDC, automático en Vercel) o disco local
+en `.cache/storage` si no hay credenciales (`STORAGE_BACKEND=auto`). Para probar Blob en local:
+`vercel link` + `vercel env pull`.
+
+### CLI de depuración
+
+```bash
+uv run python -m app.cv.cli --source app/assets/NCCA.mp4   # genera app/assets/out/*.tracks.json y .tracked.mp4
+```
+
 ## Estructura
 
 ```
@@ -40,7 +64,8 @@ app/
 ├── main.py          # FastAPI app, lifespan, handlers
 ├── api/             # routers
 ├── core/            # config, logger, errores de dominio
-├── clients/         # clientes HTTP externos
+├── clients/         # clientes externos (HTTP, almacenamiento Blob/local)
+├── cv/              # detección (Roboflow), filtro de pista y ByteTrack
 ├── dependencies/    # dependencias de FastAPI
 ├── repositories/    # acceso a datos (stub)
 ├── schemas/         # modelos Pydantic

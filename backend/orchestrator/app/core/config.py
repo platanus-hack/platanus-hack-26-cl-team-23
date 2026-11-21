@@ -68,6 +68,19 @@ class Settings:
         ).strip()
         self.roboflow_model_id: str = os.getenv("ROBOFLOW_MODEL_ID", "rfdetr-medium").strip()
 
+        # Almacenamiento: Vercel Blob o disco local (auto = Blob solo si hay credenciales)
+        self.blob_store_id: str = os.getenv("BLOB_STORE_ID", "").strip()
+        self.blob_access: str = os.getenv("BLOB_ACCESS", "public").strip().lower()
+        if self.blob_access not in {"public", "private"}:
+            raise RuntimeError("Environment variable BLOB_ACCESS must be 'public' or 'private'")
+        self.storage_backend: str = os.getenv("STORAGE_BACKEND", "auto").strip().lower()
+        if self.storage_backend not in {"auto", "blob", "local"}:
+            raise RuntimeError("Environment variable STORAGE_BACKEND must be auto, blob or local")
+        self.local_storage_dir: Path = _PROJECT_ROOT / ".cache" / "storage"
+
+        # Si se define, /detect y /process exigen el header X-Demo-Key
+        self.demo_access_key: str = os.getenv("DEMO_ACCESS_KEY", "").strip()
+
     @property
     def is_local(self) -> bool:
         return self.app_env.lower() == "local"

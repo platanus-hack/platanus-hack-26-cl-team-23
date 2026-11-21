@@ -1,6 +1,6 @@
 from app.cv.pipeline import TrackingParams, VideoMeta, track
 
-META = VideoMeta(source="synthetic.mp4", width=1280, height=720, fps_src=60.0, frames_src=600)
+META = VideoMeta(source="synthetic.mp4", width=1280, height=720, fps_src=60.0, duration_s=10.0)
 ROI = [(0, 200), (1280, 200), (1280, 500), (0, 500)]
 
 
@@ -17,7 +17,8 @@ def _frames(n: int) -> tuple[list[int], list[list[list[float]]]]:
 
 def test_track_keeps_stable_ids_and_filters_crowd() -> None:
     indices, raw = _frames(60)
-    result = track(META, indices, raw, TrackingParams(roi=ROI))
+    times = [i / META.fps_src for i in indices]
+    result = track(META, indices, times, raw, TrackingParams(roi=ROI))
 
     assert len(result["tracks"]) == 2
     assert {t["id"] for t in result["tracks"]} == {
@@ -29,7 +30,8 @@ def test_track_keeps_stable_ids_and_filters_crowd() -> None:
 
 def test_track_timestamps_are_seconds_of_source_video() -> None:
     indices, raw = _frames(10)
-    result = track(META, indices, raw, TrackingParams(roi=ROI, min_track_seconds=0))
+    times = [i / META.fps_src for i in indices]
+    result = track(META, indices, times, raw, TrackingParams(roi=ROI, min_track_seconds=0))
 
     assert result["frames"][1]["t"] == round(4 / 60.0, 3)
     assert result["video"]["fps_out"] == 15.0
