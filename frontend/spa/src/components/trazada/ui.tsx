@@ -72,16 +72,24 @@ export function Pending({ children }: { children: ReactNode }) {
 }
 
 /**
- * Marca de TRAZADA: la curva de una pista vista desde arriba. Tres carriles concéntricos;
- * los interiores en tinta y el exterior en naranja: ir por fuera es exactamente lo que medimos.
+ * Marca de TRAZADA: una T hecha de carriles. Monocroma; toma el color del texto
+ * (currentColor), así que en fondo oscuro pasa a blanco sola.
  */
 export function TrackMark({ className = '' }: { className?: string }) {
-  const lane = (r: number) => `M4 ${20 - r} H17 A${r} ${r} 0 0 1 17 ${20 + r} H4`
   return (
-    <svg viewBox="0 0 40 40" className={className} aria-hidden="true" fill="none" strokeLinecap="round" strokeWidth="3.4">
-      <path d={lane(5.5)} stroke="var(--color-fg)" />
-      <path d={lane(10.5)} stroke="var(--color-fg)" />
-      <path d={lane(15.5)} stroke="var(--color-pick)" />
+    <svg
+      viewBox="0 0 40 40"
+      className={className}
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeWidth="3.6"
+    >
+      <path d="M4 6 H36" />
+      <path d="M4 13 H8 A6 6 0 0 1 14 19 V36" />
+      <path d="M36 13 H32 A6 6 0 0 0 26 19 V36" />
+      <path d="M20 13 V36" />
     </svg>
   )
 }
