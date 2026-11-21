@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { LANE, LANES, LAP, R, STRAIGHT, trackToWorld, type Vec2 } from '../../trazada/geometry'
-import { polygon, polyline, range } from '../../trazada/draw'
+import { polyline, range } from '../../trazada/draw'
 import { fmtNum, themeColor, themeFont } from '../../trazada/format'
 import type { Race } from '../../trazada/types'
 import { useCanvas } from '../../trazada/useCanvas'
@@ -34,34 +34,28 @@ export function TopView({ race, frameIndex }: Props) {
     const at = (s: number, d: number) => toScreen(...trackToWorld(s, d))
     const lap = range(0, LAP, 0.5)
     const mono = themeFont('mono')
-    const sans = themeFont('sans')
-    const accent = themeColor('accent')
 
     ctx.clearRect(0, 0, size.w, size.h)
 
-    // Pista en tonos apagados: los datos son lo único que debe gritar.
-    ctx.fillStyle = '#17271e'
-    polygon(ctx, lap.map((s) => at(s, 0)))
-    ctx.fillStyle = '#47291f'
-    ctx.beginPath()
-    lap.forEach((s, i) => (i ? ctx.lineTo(...at(s, BAND)) : ctx.moveTo(...at(s, BAND))))
-    ctx.closePath()
-    lap.forEach((s, i) => (i ? ctx.lineTo(...at(s, 0)) : ctx.moveTo(...at(s, 0))))
-    ctx.closePath()
-    ctx.fill('evenodd')
-    ctx.strokeStyle = 'rgba(243,233,226,.16)'
-    ctx.lineWidth = 0.8
-    for (let lane = 1; lane < LANES; lane++) polyline(ctx, lap.map((s) => at(s, lane * LANE)))
-    ctx.strokeStyle = 'rgba(243,233,226,.5)'
+    // Pista como un mapa: carriles en grises alternados (tokens lane-1..8) y líneas blancas.
+    for (let lane = 0; lane < LANES; lane++) {
+      ctx.fillStyle = themeColor(`lane-${lane + 1}`)
+      ctx.beginPath()
+      lap.forEach((s, i) => (i ? ctx.lineTo(...at(s, (lane + 1) * LANE)) : ctx.moveTo(...at(s, (lane + 1) * LANE))))
+      ctx.closePath()
+      lap.forEach((s, i) => (i ? ctx.lineTo(...at(s, lane * LANE)) : ctx.moveTo(...at(s, lane * LANE))))
+      ctx.closePath()
+      ctx.fill('evenodd')
+    }
+    ctx.strokeStyle = themeColor('trackline')
     ctx.lineWidth = 1
-    polyline(ctx, lap.map((s) => at(s, 0)))
-    polyline(ctx, lap.map((s) => at(s, BAND)))
+    for (let lane = 0; lane <= LANES; lane++) polyline(ctx, lap.map((s) => at(s, lane * LANE)))
 
     // Meta
-    ctx.strokeStyle = '#ffffff'
+    ctx.strokeStyle = themeColor('fg')
     ctx.lineWidth = 2
     polyline(ctx, [at(0, 0), at(0, BAND)])
-    ctx.font = `700 10px ${sans}`
+    ctx.font = `500 10px ${mono}`
     ctx.fillStyle = themeColor('muted')
     ctx.textAlign = 'center'
     const [mx, my] = at(0, BAND + 4)
@@ -69,12 +63,12 @@ export function TopView({ race, frameIndex }: Props) {
 
     // Medidas oficiales, discretas
     ctx.font = `500 10px ${mono}`
-    ctx.fillStyle = 'rgba(138,151,169,.85)'
+    ctx.fillStyle = themeColor('muted')
     const [sx, sy] = toScreen(0, -(R - 6))
     ctx.fillText(`recta ${fmtNum(STRAIGHT, 2)} m`, sx, sy)
     const c = toScreen(STRAIGHT / 2, 0)
     const kx = toScreen(STRAIGHT / 2 + R, 0)
-    ctx.strokeStyle = 'rgba(138,151,169,.5)'
+    ctx.strokeStyle = themeColor('other')
     ctx.lineWidth = 1
     polyline(ctx, [c, kx])
     ctx.beginPath()
@@ -84,12 +78,13 @@ export function TopView({ race, frameIndex }: Props) {
     ctx.fillText(`${LANES} × ${fmtNum(LANE, 2)} m`, (c[0] + kx[0]) / 2, c[1] + 15)
     ctx.textAlign = 'start'
 
-    // Tramo que recorrió el encuadre durante todo el video: arco naranja por fuera.
+    // Tramo que recorrió el encuadre durante todo el video: arco de tinta por fuera.
+    // (El naranja queda reservado para el corredor elegido.)
     if (race.camera) {
       const [s0, s1] = race.camera.span
       ctx.save()
-      ctx.strokeStyle = accent
-      ctx.globalAlpha = 0.35
+      ctx.strokeStyle = themeColor('fg')
+      ctx.globalAlpha = 0.3
       ctx.lineWidth = 3
       ctx.lineCap = 'round'
       polyline(ctx, range(s0, s1, 0.5).map((s) => at(s, BAND + 2.6)))
@@ -100,11 +95,11 @@ export function TopView({ race, frameIndex }: Props) {
     if (frame?.focusS !== undefined) {
       const [x, y] = at(frame.focusS, BAND / 2)
       ctx.save()
-      ctx.fillStyle = accent
+      ctx.fillStyle = themeColor('fg')
       ctx.beginPath()
       ctx.arc(x, y, 6, 0, Math.PI * 2)
       ctx.fill()
-      ctx.strokeStyle = themeColor('panel')
+      ctx.strokeStyle = themeColor('surface')
       ctx.lineWidth = 2
       ctx.stroke()
       ctx.restore()

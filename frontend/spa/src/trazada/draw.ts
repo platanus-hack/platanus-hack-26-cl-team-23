@@ -19,13 +19,13 @@ export function range(from: number, to: number, step: number) {
   return out
 }
 
-/** Etiqueta tipo "pastilla" centrada en (x, y). */
+/** Rótulo rectangular centrado en (x, y), como una etiqueta impresa. */
 export function pill(
   ctx: CanvasRenderingContext2D,
   text: string,
   x: number,
   y: number,
-  opts: { font: string; color: string; swatch?: string },
+  opts: { font: string; color: string; bg: string; swatch?: string },
 ) {
   ctx.font = opts.font
   const tw = ctx.measureText(text).width
@@ -34,15 +34,11 @@ export function pill(
   const h = 20
   // que no se salga por los bordes del canvas
   const left = Math.min(Math.max(4, x - w / 2), ctx.canvas.clientWidth - w - 4)
-  ctx.fillStyle = 'rgba(10,14,20,.82)'
-  ctx.beginPath()
-  ctx.roundRect(left, y - h / 2, w, h, 5)
-  ctx.fill()
+  ctx.fillStyle = opts.bg
+  ctx.fillRect(left, y - h / 2, w, h)
   if (opts.swatch) {
     ctx.fillStyle = opts.swatch
-    ctx.beginPath()
-    ctx.arc(left + 9, y, 3.5, 0, Math.PI * 2)
-    ctx.fill()
+    ctx.fillRect(left + 6, y - 3, 6, 6)
   }
   ctx.fillStyle = opts.color
   ctx.textBaseline = 'middle'

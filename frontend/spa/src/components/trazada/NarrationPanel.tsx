@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../../lib/api'
 import { generateNarration, type Narration } from '../../trazada/narration'
 import type { Race } from '../../trazada/types'
+import { Button, Figure } from './ui'
 
 type Props = {
   race: Race
@@ -97,77 +98,56 @@ export function NarrationPanel({ race, t, playing }: Props) {
     }
   }
 
+  const meta = narration
+    ? `${narration.source === 'llm' ? 'Guion de Claude' : 'Guion automático'} · ${narration.segments.length} tramos${
+        narration.cached ? ' · caché' : ''
+      }${narration.audio.length > 0 && voice && playing ? ' · sonando' : ''}`
+    : undefined
+
   return (
-    <section className="rounded-xl border border-line bg-panel px-5 py-4" aria-live="polite">
-      <header className="flex flex-wrap items-center gap-3">
-        <h2 className="text-sm font-semibold">Relato</h2>
-        {narration && (
-          <p className="text-xs text-muted">
-            {narration.source === 'llm' ? 'guion de Claude' : 'guion automático'} ·{' '}
-            {narration.segments.length} tramos
-            {narration.cached && ' · desde caché'}
-            {narration.audio.length > 0 && voice && playing && ' · sonando'}
-          </p>
-        )}
-        <div className="ml-auto flex items-center gap-3">
+    <Figure title="Relato" meta={meta}>
+      <div aria-live="polite">
+        <div className="flex flex-wrap items-center gap-3">
+          {state.kind === 'idle' && (
+            <Button variant="primary" onClick={generate}>
+              Generar relato
+            </Button>
+          )}
+          {state.kind === 'loading' && <span className="label text-muted">Escribiendo el relato…</span>}
           {narration && narration.audio.length > 0 && (
-            <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted select-none">
-              <input
-                type="checkbox"
-                checked={voice}
-                onChange={(e) => setVoice(e.target.checked)}
-                className="accent-accent"
-              />
+            <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted select-none">
+              <input type="checkbox" checked={voice} onChange={(e) => setVoice(e.target.checked)} />
               Voz
             </label>
           )}
-          {state.kind === 'idle' && (
-            <button
-              type="button"
-              onClick={generate}
-              className="min-h-9 rounded-md bg-accent px-3 text-sm font-semibold text-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              Generar relato
-            </button>
-          )}
-          {state.kind === 'loading' && (
-            <span className="font-mono text-xs text-muted">escribiendo el relato…</span>
-          )}
           {narration && narration.audio.length === 0 && (
-            <span className="text-xs text-muted">sin voz configurada, solo texto</span>
+            <span className="label text-muted">Sin voz configurada, solo texto</span>
           )}
         </div>
-      </header>
 
-      {state.kind === 'error' && (
-        <p
-          role="alert"
-          className="mt-3 rounded-md border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-200"
-        >
-          {state.message}
-        </p>
-      )}
+        {state.kind === 'error' && (
+          <p role="alert" className="mt-3 rounded-inner bg-paper2 p-4 text-sm text-loss">
+            {state.message}
+          </p>
+        )}
 
-      {narration && (
-        <>
-          <ol className="mt-3 flex flex-col gap-2">
-            {narration.segments.map((segment, i) => (
-              <li
-                key={i}
-                className={`flex gap-3 rounded-md px-2 py-1.5 transition-colors ${
-                  active === i ? 'bg-pick/10' : ''
-                }`}
-              >
-                <span className="w-12 shrink-0 pt-0.5 font-mono text-[11px] text-muted tabular-nums">
-                  {segment.start.toFixed(0)}s
-                </span>
-                <p className={`text-sm ${active === i ? 'text-fg' : 'text-fg/80'}`}>{segment.text}</p>
-              </li>
-            ))}
-          </ol>
-          <p className="mt-3 text-xs text-muted">{narration.disclaimer}</p>
-        </>
-      )}
-    </section>
+        {narration && (
+          <>
+            <ol className="mt-3 flex flex-col gap-1">
+              {narration.segments.map((segment, i) => (
+                <li
+                  key={i}
+                  className={`flex gap-4 rounded-inner px-3 py-2 transition-colors ${active === i ? 'bg-paper2' : ''}`}
+                >
+                  <span className="label w-12 shrink-0 pt-0.5 text-muted tabular-nums">{segment.start.toFixed(0)} s</span>
+                  <p className={`text-sm ${active === i ? 'font-semibold text-fg' : 'text-muted'}`}>{segment.text}</p>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-3 text-xs text-muted">{narration.disclaimer}</p>
+          </>
+        )}
+      </div>
+    </Figure>
   )
 }

@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import { BarcodeScrubber } from '../components/trazada/BarcodeScrubber'
 import { CameraView } from '../components/trazada/CameraView'
 import { NarrationPanel } from '../components/trazada/NarrationPanel'
 import { RunnerList, RunnerStats } from '../components/trazada/RunnerList'
-import { UploadPanel } from '../components/trazada/UploadPanel'
 import { TopView } from '../components/trazada/TopView'
+import { UploadPanel } from '../components/trazada/UploadPanel'
+import { Button, Figure, PageTitle, Pending } from '../components/trazada/ui'
+import { NavActions } from '../navActions'
 import { frameAt } from '../trazada/adapter'
 import { fmtNum, fmtSeconds } from '../trazada/format'
 import type { Race } from '../trazada/types'
@@ -20,8 +23,11 @@ export default function Home() {
 
   if (!race)
     return (
-      <div className="flex flex-col gap-6">
-        <Header title="Analiza tu carrera" subtitle="Sube el video de una curva y TRAZADA sigue a cada corredor." />
+      <div className="flex flex-col gap-10">
+        <PageTitle
+          title="Mira la carrera que el cronómetro no ve."
+          lede="Sube el video de una curva: TRAZADA sigue a cada corredor cuadro a cuadro y lo ubica en la pista."
+        />
         <UploadPanel onReady={replace} />
       </div>
     )
@@ -29,16 +35,13 @@ export default function Home() {
   return <RaceScreen key={race.video.url} race={race} onNewUpload={() => replace(null)} />
 }
 
-function Header({ title, subtitle, action }: { title: string; subtitle: string; action?: React.ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-      <div className="min-w-0">
-        <h1 className="font-display text-[32px] leading-none font-extrabold">{title}</h1>
-        <p className="mt-1 text-sm text-muted">{subtitle}</p>
-      </div>
-      {action && <div className="ml-auto flex flex-wrap items-center gap-3">{action}</div>}
-    </div>
-  )
+/** Título con valor: qué se midió y en cuántos metros de pista. */
+function raceTitle(race: Race) {
+  const n = race.runners.length
+  const who = `${n} ${n === 1 ? 'corredor' : 'corredores'}`
+  if (!race.camera) return `${who} seguidos en ${fmtNum(race.video.duration, 1)} s`
+  const meters = Math.abs(race.camera.span[1] - race.camera.span[0])
+  return `${who} en ${fmtNum(meters, 0)} m de pista`
 }
 
 function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void }) {
@@ -48,30 +51,26 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
   const fi = frameAt(race.frames, t)
   const frame = race.frames[fi]
   const selected = race.runners.find((r) => r.id === selectedId)
+  const zone = frame?.zone !== undefined ? (race.camera?.names[frame.zone] ?? `Zona ${frame.zone}`) : undefined
+
+  const facts = [
+    race.title,
+    race.pipeline ? `${race.pipeline.detector} + ${race.pipeline.tracker}` : undefined,
+    `${fmtSeconds(race.video.duration)} · ${race.frames.length} cuadros`,
+    race.camera ? `Tramo ${fmtNum(race.camera.span[0], 0)}–${fmtNum(race.camera.span[1], 0)} m` : undefined,
+  ].filter((f): f is string => !!f)
 
   return (
-    <div className="flex flex-col gap-6">
-      <Header
-        title={race.title}
-        subtitle={
-          race.note ??
-          `${race.runners.length} corredores seguidos con ${race.pipeline?.detector ?? 'el detector'} + ${
-            race.pipeline?.tracker ?? 'el tracker'
-          }`
-        }
-        action={
-          <button
-            type="button"
-            onClick={onNewUpload}
-            className="min-h-9 rounded-md border border-line px-3 text-sm font-semibold text-fg hover:border-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            Subir otro video
-          </button>
-        }
-      />
+    <div className="flex flex-col gap-10">
+      <NavActions>
+        <Button onClick={onNewUpload}>Subir otro video</Button>
+      </NavActions>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="min-w-0 overflow-hidden rounded-xl border border-line bg-panel">
+      <PageTitle title={raceTitle(race)} facts={facts} />
+      {race.note && <Pending>{race.note}</Pending>}
+
+      <div className="grid items-start gap-[var(--section-gap)] lg:grid-cols-[minmax(0,1fr)_340px]">
+        <Figure title="Cámara" flush meta={`${frame?.runners.length ?? 0} en pantalla · ${fmtSeconds(t)}`}>
           <div className="relative">
             <CameraView
               race={race}
@@ -82,102 +81,69 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
               selectedId={selectedId}
               onSelect={setSelectedId}
             />
-            {/* HUD tipo transmisión */}
-            <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-4">
-              <span className="flex items-center gap-2 rounded bg-black/55 px-2 py-1 text-xs font-semibold backdrop-blur-sm">
-                <span className="h-2 w-2 rounded-full bg-red-500" />
-                <span className="font-mono text-fg/80 tabular-nums">{fmtSeconds(t)}</span>
-                <span className="text-fg/80">· {frame?.runners.length ?? 0} en pantalla</span>
-              </span>
-              {frame?.zone !== undefined && (
-                <span className="hidden rounded bg-black/55 px-2 py-1 text-xs font-semibold backdrop-blur-sm sm:inline">
-                  {race.camera?.names[frame.zone] ?? `Zona ${frame.zone}`}
-                </span>
-              )}
-            </div>
+            {zone && (
+              <span className="label glass pointer-events-none absolute top-3 right-3 rounded-ui px-2.5 py-1 text-fg">{zone}</span>
+            )}
           </div>
-          {/* Controles */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line px-4 py-2">
+          {/* Controles: la línea de tiempo es un código de barras de la carrera */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-6 py-4">
             <button
               type="button"
               onClick={toggle}
               aria-label={playing ? 'Pausar' : 'Reproducir'}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-bg transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-fg text-white transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               {playing ? <PauseIcon /> : <PlayIcon />}
             </button>
-            <input
-              type="range"
-              min={0}
-              max={race.video.duration}
-              step={0.01}
-              value={t}
-              onChange={(e) => seek(Number(e.target.value))}
-              aria-label="Línea de tiempo"
-              className="min-w-40 flex-1 accent-accent"
-            />
-            <span className="font-mono text-xs whitespace-nowrap text-muted tabular-nums">
+            <BarcodeScrubber race={race} t={t} onSeek={seek} />
+            <span className="label whitespace-nowrap text-muted">
               {fmtSeconds(t)} / {fmtSeconds(race.video.duration)}
             </span>
             <Toggle checked={overlay} onChange={setOverlay} label="Capa del detector" />
           </div>
-        </section>
+        </Figure>
 
-        <aside className="flex min-w-0 flex-col gap-4">
-          <RunnerList race={race} frameIndex={fi} selectedId={selectedId} onSelect={setSelectedId} />
-        </aside>
+        <RunnerList race={race} frameIndex={fi} selectedId={selectedId} onSelect={setSelectedId} />
       </div>
 
       {/* key: al cambiar de video, el relato anterior se descarta sin efectos raros */}
       <NarrationPanel key={race.video.url} race={race} t={t} playing={playing} />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div className="grid gap-[var(--section-gap)] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         {race.camera && (
-          <section className="min-w-0 overflow-hidden rounded-xl border border-line bg-panel">
-            <header className="flex items-baseline justify-between gap-4 px-6 pt-4">
-              <h2 className="text-sm font-semibold">Dónde mira la cámara</h2>
-              <p className="text-xs text-muted">pista de 400 m a escala</p>
-            </header>
+          <Figure title="Dónde mira la cámara" flush meta="Pista de 400 m a escala">
             <TopView race={race} frameIndex={fi} />
-            <dl className="flex flex-wrap gap-x-6 gap-y-1 px-6 pb-4 text-xs text-muted">
-              <div className="flex gap-1.5">
-                <dt>Tramo enfocado:</dt>
-                <dd className="font-mono text-fg tabular-nums">
-                  {fmtNum(race.camera.span[0], 0)}–{fmtNum(race.camera.span[1], 0)} m
-                </dd>
-              </div>
-              <div className="flex gap-1.5">
-                <dt>Cambios de plano:</dt>
-                <dd className="font-mono text-fg tabular-nums">{race.camera.cuts.length}</dd>
-              </div>
-              {frame?.focusV !== undefined && (
-                <div className="flex gap-1.5">
-                  <dt>Barrido:</dt>
-                  <dd className="font-mono text-fg tabular-nums">{fmtNum(frame.focusV, 1)} m/s</dd>
-                </div>
-              )}
+            <dl className="grid grid-cols-3 gap-2 px-6 pt-2 pb-6">
+              <Stat term="Tramo enfocado" value={`${fmtNum(race.camera.span[0], 0)}–${fmtNum(race.camera.span[1], 0)} m`} />
+              <Stat term="Cambios de plano" value={`${race.camera.cuts.length}`} />
+              <Stat term="Barrido" value={frame?.focusV !== undefined ? `${fmtNum(frame.focusV, 1)} m/s` : '—'} />
             </dl>
-          </section>
+          </Figure>
         )}
 
         {selected && (
-          <section className="min-w-0 rounded-xl border border-line bg-panel p-6">
-            <header className="mb-4 flex items-baseline gap-3">
-              <h2 className="text-sm font-semibold">Ficha del corredor</h2>
-              <p className="font-display text-2xl leading-none font-bold">{selected.label}</p>
-            </header>
+          <Figure title="Ficha del corredor" meta={`Corredor ${selected.label}`}>
             <RunnerStats race={race} selectedId={selected.id} />
-          </section>
+          </Figure>
         )}
       </div>
     </div>
   )
 }
 
+function Stat({ term, value }: { term: string; value: string }) {
+  return (
+    <div className="bento flex min-h-20 flex-col justify-between p-3">
+      <dt className="label text-muted">{term}</dt>
+      <dd className="text-xl font-semibold whitespace-nowrap">{value}</dd>
+    </div>
+  )
+}
+
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-xs text-muted select-none">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-accent" />
+    <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted select-none">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       {label}
     </label>
   )
