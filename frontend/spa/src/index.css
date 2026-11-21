@@ -1,1 +1,34 @@
 @import "tailwindcss";
+
+/* Tokens del mock de TRAZADA. Tailwind 4 crea una clase por cada uno:
+   --color-panel → bg-panel, text-panel, border-panel… y los dibujos en canvas
+   los leen como variables CSS, así todo comparte la misma paleta. */
+@theme static {
+  --color-bg: #0e131a;
+  --color-panel: #151c26;
+  --color-line: #253042;
+  --color-fg: #e9eef4;
+  --color-muted: #a9b4c4; /* más claro que antes: pasa contraste 4,5:1 sobre el panel */
+  --color-accent: #ff6b2c;
+  --color-hero: #7dffbf; /* texto del corredor elegido */
+  --color-pick: #3dd68c; /* trazo/punto del corredor elegido */
+  --color-other: #aab4c3; /* el resto de los corredores */
+  --color-track: #a8432e;
+  --color-trackline: #f3e9e2;
+  --color-grass: #1f3d2b;
+  --color-grass2: #244a33;
+
+  --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}

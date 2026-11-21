@@ -113,3 +113,8 @@ tmp/
 
 # Videos de ejemplo y resultados: viven en Vercel Blob (presets/), publicar con app.cv.publish_presets
 backend/orchestrator/app/assets/
+
+# Investigación local (no subir)
+research/
+trazada.html
+.claude/settings.local.json

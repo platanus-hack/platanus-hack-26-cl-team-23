@@ -1,33 +1,24 @@
-import { Link, NavLink, Route, Routes } from 'react-router'
+import { Link, Route, Routes } from 'react-router'
 import About from './pages/About'
 import Home from './pages/Home'
 import NotFound from './pages/NotFound'
 
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-    isActive
-      ? 'bg-emerald-500 text-slate-950'
-      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-  }`
-
 function App() {
   return (
-    <div className="min-h-svh bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800">
-        <nav className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3">
-          <Link to="/" className="mr-auto font-semibold tracking-tight">
-            spa
+    <div className="min-h-svh bg-bg text-fg">
+      <header className="border-b border-line">
+        <nav className="mx-auto flex min-h-14 max-w-[1280px] flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2 sm:px-8">
+          <Link to="/" className="flex items-center gap-2.5 font-display text-2xl leading-none font-extrabold tracking-wide">
+            <Logo />
+            TRAZADA
           </Link>
-          <NavLink to="/" end className={navLinkClass}>
-            Inicio
-          </NavLink>
-          <NavLink to="/about" className={navLinkClass}>
-            Acerca
-          </NavLink>
+          <span className="text-sm text-muted">
+            Metros extra en cada curva
+          </span>
         </nav>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-10">
+      <main className="mx-auto max-w-[1280px] px-4 py-6 sm:px-8">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
@@ -35,6 +26,15 @@ function App() {
         </Routes>
       </main>
     </div>
+  )
+}
+
+function Logo() {
+  return (
+    <svg viewBox="0 0 42 24" className="h-6 w-[42px]" aria-hidden="true">
+      <path d="M2 22 L14 2 H22 L10 22 Z" fill="var(--color-accent)" />
+      <path d="M18 22 L30 2 H38 L26 22 Z" fill="var(--color-accent)" />
+    </svg>
   )
 }
 
