@@ -6,6 +6,9 @@ import { visibleAt } from '../../trazada/adapter'
 import type { Race } from '../../trazada/types'
 import { useCanvas } from '../../trazada/useCanvas'
 
+/** Cajas del resto de corredores: azul eléctrico, para que contraste con la pista y con el naranja del elegido. */
+const BOX_COLOR = '#1f5bff'
+
 type Props = {
   race: Race
   frameIndex: number
@@ -55,8 +58,8 @@ export function CameraView({ race, frameIndex, t, playing, showOverlay, selected
       const [x1, y1, x2, y2] = r.bbox.map((n) => n * k)
       const isSel = r.rid !== undefined && r.rid === selectedId
       const c = Math.min(10, (x2 - x1) / 3)
-      ctx.strokeStyle = isSel ? pick : 'rgba(255,255,255,.6)'
-      ctx.lineWidth = isSel ? 2 : 1.2
+      ctx.strokeStyle = isSel ? pick : BOX_COLOR
+      ctx.lineWidth = isSel ? 2.5 : 2
       ctx.globalAlpha = r.stale ? 0.5 : 1
       ctx.beginPath()
       for (const [cx0, cy0, dx, dy] of [
