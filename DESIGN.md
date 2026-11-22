@@ -89,7 +89,7 @@ Reglas:
 
 ## 4. Logo
 
-**"Carriles": una T hecha de carriles.** Una barra arriba y tres carriles que bajan; los dos de los costados nacen de la barra con una curva, como una pista que dobla. Monocroma en tinta `#1D1D1F`. El color de acento de la marca se define más adelante: mientras tanto no se le agrega ninguno.
+**"Carriles": una T hecha de carriles.** Una barra arriba y tres carriles que bajan; los dos de los costados nacen de la barra con una curva, como una pista que dobla. Monocroma en tinta `#1D1D1F`, a propósito: el naranja queda reservado para el dato protagonista y no compite con la marca en cada pantalla.
 
 ```svg
 <svg viewBox="0 0 40 40" fill="none" stroke="#1D1D1F" stroke-width="3.6" stroke-linecap="round" xmlns="http://www.w3.org/2000/svg">
@@ -131,7 +131,7 @@ Reglas:
 
 ## 7. No hacer
 
-- Degradados morados o azules genéricos, brillos, neón, fondos oscuros con un acento que brilla.
+- Degradados morados o azules genéricos, brillos, neón, acentos que brillan sobre fondo oscuro (el modo oscuro de la sección 9 es sobrio: mismos colores, sin brillo).
 - Íconos o ilustraciones de stock, emojis como íconos.
 - Color decorativo (bloques oliva, beige, etc. sin significado).
 - Líneas verticales para "tabular" textos, rótulos sobre cada título (*eyebrows*), numeración 01/02/03 decorativa.
@@ -144,3 +144,42 @@ Reglas:
 ## 8. Voz
 
 Español chileno, directo y deportivo. Frases cortas. Primero el valor, después lo técnico. Las cifras siempre con unidad y coma decimal (`0,41 m`, `20,7 s`). Las afirmaciones van con su fuente (por ejemplo *González-Mohíno et al., 2021*).
+
+---
+
+## 9. Modo oscuro
+
+**Para qué:** presentar. En la pantalla del escenario y al compartir pantalla, el blanco se sobresatura y "quema" la imagen; el negro no. Es el mismo sistema "Pista" con otros valores para los mismos tokens: las reglas de color no cambian (naranja solo para el protagonista, verde/rojo solo para ganó/perdió, todo lo demás en grises, el cielo solo en sus dos lugares).
+
+**Cómo se activa** (en orden de prioridad):
+1. `?tema=oscuro` o `?tema=claro` en la URL. **Para el escenario: abrir la app con `?tema=oscuro`.**
+2. El botón sol/luna del header, que recuerda la elección.
+3. Lo que pide el sistema operativo.
+
+En código: `data-theme="dark"` en `<html>`, el bloque `:root[data-theme="dark"]` de `frontend/spa/src/index.css` y `src/trazada/theme.ts`. Un script en `index.html` aplica el tema antes de pintar, para que no parpadee en blanco. Los dibujos en canvas (cámara y vista cenital) vuelven a leer los colores y se redibujan al cambiar.
+
+| Token | Claro | Oscuro | Nota |
+|---|---|---|---|
+| Fondo (`bg`) | `#F5F5F7` | `#000000` | El proyector no emite luz: no satura |
+| Superficie (`surface`) | `#FFFFFF` | `#1C1C1E` | Secciones |
+| Zona secundaria (`paper2`) | `#F5F5F7` | `#2C2C2E` | Bloques de cifra |
+| Línea (`line`) | `#E5E5EA` | `#38383A` | |
+| Tinta (`fg`) | `#1D1D1F` | `#F2F2F4` | Casi blanco, nunca `#FFF` puro en superficies grandes (15:1) |
+| Tinta suave (`muted`) | `#6E6E73` | `#A1A1A6` | 6,6:1 sobre superficie |
+| Naranja protagonista (`pick`) | `#FF5B14` | `#FF5B14` | No cambia |
+| Naranja como texto (`hero`) | `#C2410C` | `#FF8A50` | Sobre oscuro se aclara (7,3:1) |
+| Franja de costo (`band`) | `#FFD8C4` | `#4A2414` | Tinte oscuro, no claro |
+| Resto de corredores (`other`) | `#8E8E93` | `#8E8E93` | |
+| Ganó (`gain`) | `#1A7F37` | `#30D158` | |
+| Perdió (`loss`) | `#D70015` | `#FF453A` | |
+| Acción (`accent`) | `#0071E3` | `#0071E3` | Igual en ambos: con `#0A84FF` el texto blanco del botón queda en 3,6:1 y no pasa AA |
+| Carriles (alternados) | `#E8E8ED` / `#DEDEE3` | `#232326` / `#2A2A2D` | |
+| Líneas de pista (`trackline`) | `#FFFFFF` | `#48484C` | Más claras que los carriles, sin brillar |
+| Pasto (`grass`) | `#F5F5F7` | `#111113` | |
+
+- **Vidrio esmerilado:** `rgba(28, 28, 30, .72)` con el mismo desenfoque, texto claro.
+- **Cielo con grano:** atardecer nocturno, grano al 25 %:
+  `radial-gradient(120% 90% at 50% 115%, #FF5B14 0%, #B8461E 20%, #4A2638 44%, #1B1A33 70%, #08080F 100%)`. Sobre él, texto claro.
+- **Logo:** `currentColor`, pasa a claro solo.
+- Sobre el naranja, el texto sigue en tinta oscura `#1D1D1F`, también en modo oscuro.
+- Las capas dibujadas sobre el video no cambian: el video ya es oscuro.

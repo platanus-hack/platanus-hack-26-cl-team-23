@@ -102,7 +102,7 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
               type="button"
               onClick={toggle}
               aria-label={playing ? 'Pausar' : 'Reproducir'}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-fg text-white transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-fg text-bg transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               {playing ? <PauseIcon /> : <PlayIcon />}
             </button>

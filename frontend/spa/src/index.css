@@ -13,8 +13,8 @@
    - el "cielo" con grano es el único gesto expresivo, y solo en dos lugares
      (cabecera del resultado y zona de subida).
 
-   Los componentes solo usan tokens. Un modo oscuro futuro = otro bloque de
-   valores para los mismos tokens (:root[data-theme="dark"]), sin tocar componentes.
+   Los componentes solo usan tokens. El modo oscuro es otro bloque de valores
+   para los mismos tokens (:root[data-theme="dark"], más abajo), sin tocar componentes.
    ===================================================================== */
 
 /* ---------- Tokens ----------
@@ -118,6 +118,40 @@
   /* Movimiento: una curva para todo (salida exponencial) */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* ---------- Modo oscuro ----------
+   Para presentar: en el proyector y al compartir pantalla, el blanco se sobresatura.
+   Mismos tokens, otros valores; las reglas de color no cambian. Se activa con
+   data-theme="dark" en <html> (ver src/trazada/theme.ts). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #000000; /* el proyector no emite luz: no satura */
+  --color-surface: #1c1c1e;
+  --color-paper2: #2c2c2e;
+  --color-line: #38383a;
+  --color-fg: #f2f2f4; /* casi blanco, nunca #fff en superficies grandes */
+  --color-muted: #a1a1a6; /* ~7:1 sobre surface */
+  --color-pick: #ff5b14; /* el protagonista no cambia */
+  --color-hero: #ff8a50; /* naranja como texto: sobre oscuro se aclara */
+  --color-band: #4a2414; /* franja de costo: tinte oscuro */
+  --color-other: #8e8e93;
+  --color-gain: #30d158;
+  --color-loss: #ff453a;
+  --color-accent: #0071e3; /* mismo azul que en claro: con #0a84ff el texto blanco del botón queda en 3,6:1 (no pasa AA); este da 4,7:1 y el anillo de foco 3,6:1 sobre surface */
+  --color-lane-1: #232326;
+  --color-lane-2: #2a2a2d;
+  --color-lane-3: #232326;
+  --color-lane-4: #2a2a2d;
+  --color-lane-5: #232326;
+  --color-lane-6: #2a2a2d;
+  --color-lane-7: #232326;
+  --color-lane-8: #2a2a2d;
+  --color-trackline: #48484c; /* más clara que los carriles, sin brillar */
+  --color-grass: #111113;
+  --glass-bg: rgb(28 28 30 / 0.72);
+  --sky: radial-gradient(120% 90% at 50% 115%, #ff5b14 0%, #b8461e 20%, #4a2638 44%, #1b1a33 70%, #08080f 100%);
+  --grain-opacity: 0.25;
+}
+
 @media (max-width: 640px) {
   :root {
     --h1-size: var(--text-4xl);
