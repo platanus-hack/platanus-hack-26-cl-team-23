@@ -591,6 +591,48 @@
           }
         }
       }
+    },
+    "/api/tactics/": {
+      "post": {
+        "tags": [
+          "tactics"
+        ],
+        "summary": "Tactics",
+        "description": "Pron\u00f3stico del final (P de ganar, de podio, llegada) y mejores momentos para adelantar.",
+        "operationId": "tactics_api_tactics__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TacticsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TacticsResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -911,6 +953,126 @@
         ],
         "title": "AthletesResult"
       },
+      "Attack": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Atleta que ataca"
+          },
+          "rival": {
+            "type": "integer",
+            "title": "Rival",
+            "description": "Atleta de adelante, al que pasar\u00eda"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "attack",
+              "wait",
+              "hold"
+            ],
+            "title": "Action",
+            "description": "attack: la ventana est\u00e1 abierta ahora; wait: esperar a un punto m\u00e1s adelante; hold: no hay opci\u00f3n razonable, seguir a rebufo"
+          },
+          "p_attack": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P Attack",
+            "description": "P(llegar antes que el rival) en el punto"
+          },
+          "p_now": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P Now",
+            "description": "P(llegar antes que el rival) atacando ya"
+          },
+          "at_m": {
+            "type": "number",
+            "title": "At M",
+            "description": "Metros que le faltan al rival en el punto recomendado"
+          },
+          "zone": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 1.0,
+            "title": "Zone",
+            "description": "Zona de la pista de ese punto (como en /zones)"
+          },
+          "gap": {
+            "type": "number",
+            "title": "Gap",
+            "description": "Metros que separan a los dos ahora"
+          },
+          "remaining": {
+            "type": "number",
+            "title": "Remaining",
+            "description": "Metros que le faltan al rival ahora"
+          },
+          "window": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Window",
+            "description": "Ventana de ataque en metros que faltan al rival: (desde, hasta), desde >= hasta"
+          },
+          "reserve": {
+            "type": "number",
+            "title": "Reserve",
+            "description": "Reserva de energ\u00eda del atacante (0-1, mediana)"
+          },
+          "rival_reserve": {
+            "type": "number",
+            "title": "Rival Reserve",
+            "description": "Reserva de energ\u00eda del rival (0-1, mediana)"
+          },
+          "draft_m": {
+            "type": "number",
+            "title": "Draft M",
+            "description": "Metros que el atacante lleva a rebufo"
+          },
+          "extra_m": {
+            "type": "number",
+            "title": "Extra M",
+            "description": "Metros extra que cuesta pasar por fuera en ese punto"
+          },
+          "curve": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Curve",
+            "description": "[[metros que faltan, P(adelantar)], ...] de lejos a cerca de la meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rival",
+          "action",
+          "p_attack",
+          "p_now",
+          "at_m",
+          "zone",
+          "gap",
+          "remaining",
+          "window",
+          "reserve",
+          "rival_reserve",
+          "draft_m",
+          "extra_m",
+          "curve"
+        ],
+        "title": "Attack"
+      },
       "Body_analyze_api_tracking_analyze_post": {
         "properties": {
           "frames": {
@@ -1159,6 +1321,64 @@
           "dets"
         ],
         "title": "DetectedFrame"
+      },
+      "ForecastAthlete": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "x": {
+            "type": "number",
+            "title": "X",
+            "description": "Metros recorridos (extrapolados al instante del pron\u00f3stico)"
+          },
+          "v": {
+            "type": "number",
+            "title": "V",
+            "description": "Ritmo actual suavizado (m/s)"
+          },
+          "eta": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "minItems": 3,
+            "title": "Eta",
+            "description": "Llegada estimada en segundos de carrera (reloj desde el disparo): p10, p50, p90"
+          },
+          "p_win": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P Win",
+            "description": "Probabilidad de ganar entre los medidos"
+          },
+          "p_podium": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P Podium",
+            "description": "Probabilidad de podio entre los medidos"
+          },
+          "exp_rank": {
+            "type": "number",
+            "title": "Exp Rank",
+            "description": "Puesto esperado entre los medidos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "x",
+          "v",
+          "eta",
+          "p_win",
+          "p_podium",
+          "exp_rank"
+        ],
+        "title": "ForecastAthlete"
       },
       "GroupInput": {
         "properties": {
@@ -1619,6 +1839,204 @@
           "jersey"
         ],
         "title": "RunnerFeatures"
+      },
+      "TacticsAthlete": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Atleta (el mismo id de /api/athletes/)"
+          },
+          "x": {
+            "type": "number",
+            "title": "X",
+            "description": "Metros recorridos desde la salida"
+          },
+          "v": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "V",
+            "description": "Velocidad respecto a la cancha (m/s)"
+          },
+          "d": {
+            "type": "number",
+            "title": "D",
+            "description": "Metros al bordillo",
+            "default": 0.0
+          },
+          "sigma_x": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Sigma X",
+            "description": "Incertidumbre de x (m)",
+            "default": 0.5
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "x",
+          "v"
+        ],
+        "title": "TacticsAthlete"
+      },
+      "TacticsFrame": {
+        "properties": {
+          "t": {
+            "type": "number",
+            "title": "T",
+            "description": "Segundos dentro del video"
+          },
+          "athletes": {
+            "items": {
+              "$ref": "#/components/schemas/TacticsAthlete"
+            },
+            "type": "array",
+            "title": "Athletes",
+            "description": "Solo los medidos en este cuadro"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t",
+          "athletes"
+        ],
+        "title": "TacticsFrame"
+      },
+      "TacticsRequest": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "upload"
+          },
+          "distance": {
+            "type": "number",
+            "maximum": 10000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Distance",
+            "description": "Metros de la prueba (el mismo de /zones)",
+            "default": 1500
+          },
+          "t0": {
+            "type": "number",
+            "title": "T0",
+            "description": "Segundo del video en que suena el disparo",
+            "default": 0.0
+          },
+          "every_s": {
+            "type": "number",
+            "maximum": 5.0,
+            "minimum": 0.1,
+            "title": "Every S",
+            "description": "Cada cu\u00e1ntos segundos se calcula un pron\u00f3stico",
+            "default": 1.0
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 0
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/TacticsFrame"
+            },
+            "type": "array",
+            "maxItems": 6000,
+            "minItems": 1,
+            "title": "Frames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frames"
+        ],
+        "title": "TacticsRequest"
+      },
+      "TacticsResult": {
+        "properties": {
+          "distance": {
+            "type": "number",
+            "title": "Distance"
+          },
+          "t0": {
+            "type": "number",
+            "title": "T0"
+          },
+          "every_s": {
+            "type": "number",
+            "title": "Every S"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/TacticsStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer",
+            "description": "Esto es un pron\u00f3stico de un modelo con par\u00e1metros supuestos, no una medici\u00f3n"
+          }
+        },
+        "type": "object",
+        "required": [
+          "distance",
+          "t0",
+          "every_s",
+          "steps",
+          "disclaimer"
+        ],
+        "title": "TacticsResult"
+      },
+      "TacticsStep": {
+        "properties": {
+          "t": {
+            "type": "number",
+            "title": "T",
+            "description": "Segundo del video del pron\u00f3stico"
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner",
+            "description": "Tiempo ganador pronosticado (s de carrera): p10, p50, p90"
+          },
+          "athletes": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastAthlete"
+            },
+            "type": "array",
+            "title": "Athletes",
+            "description": "Por puesto esperado"
+          },
+          "attacks": {
+            "items": {
+              "$ref": "#/components/schemas/Attack"
+            },
+            "type": "array",
+            "title": "Attacks",
+            "description": "Las mejores oportunidades, de mayor a menor P"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t",
+          "winner",
+          "athletes",
+          "attacks"
+        ],
+        "title": "TacticsStep"
       },
       "TrackFrameInput": {
         "properties": {

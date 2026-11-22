@@ -253,6 +253,7 @@ POST /api/tracking/track   ─► ids estables por corredor (ByteTrack)
 POST /api/zones/           ─► zona Z1..Z6 que enfoca la cámara en cada cuadro
 POST /api/athletes/features ─► (mismos cuadros + ids de /track) medición por cuadro: Δs y d
 POST /api/athletes/         ─► posición y velocidad de cada atleta (grupo + relativo al grupo)
+POST /api/tactics/          ─► pronóstico del final y mejores momentos para adelantar (extra, después)
 ```
 
 Mientras los lotes se detectan, el front corre `/tracking/track` sobre los primeros lotes ya listos
@@ -276,6 +277,22 @@ La geometría por corredor (metros sobre la pista, distancia al bordillo, metros
 **no usa homografía**: sale de medir dentro de cada cuadro y anclar al grupo con el filtro de zonas
 (ver [De píxeles a metros](#de-píxeles-a-metros)). Son estimaciones por video, no tiempos oficiales.
 La calibración con homografía vive aparte, en `research/trazada`, y no tiene endpoint.
+
+## Pronóstico y tácticas
+
+`POST /api/tactics/` recibe lo que ya devolvió `/athletes/` (por cuadro: `x`, `v`, `d`, `sigma_x` de cada
+atleta medido) y devuelve, cada `every_s` segundos (1 por defecto), el pronóstico de ese instante.
+El front lo pide **después** de mostrar la carrera, así que no hace esperar al video, y lo
+sincroniza con el play.
+
+| Módulo | Qué calcula |
+|---|---|
+| `cv/tactics/forecast.py` | Monte Carlo (3000 simulaciones) del resto de la carrera: **P(gana)**, **P(podio)**, puesto esperado y llegada estimada con rango p10–p90. Ritmo y sprint del grupo son factores comunes, para no confundir "todos más lentos" con "uno más lento". |
+| `cv/tactics/overtake.py` | Modelo de energía de velocidad crítica (CS, D′) con partículas por atleta, rebufo y metros extra al pasar por fuera en curva: **P(A llega antes que B)** según dónde ataque, y si conviene atacar ya, esperar o seguir a rebufo. |
+
+Es un **modelo con parámetros supuestos** (nivel del campo, reserva de energía, sprint final), no una
+medición: la respuesta lleva un `disclaimer` y la pantalla lo rotula como pronóstico. No va al
+relato con voz. Cuesta ~0,6 s de CPU para 10 atletas y 20 s de carrera, sin volver a procesar imágenes.
 
 ## Relato de la carrera
 
