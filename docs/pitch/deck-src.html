@@ -124,6 +124,12 @@ body.dark [fill="#C2410C"] { fill: var(--orange-text); }
 .qrbox .label { color: var(--ink); text-align: center; }
 .demo-go .title { padding-top: 240px; }
 .demo-go .label { color: var(--ink); }
+.tech { align-content: center; }
+.tech .title { grid-column: 1 / -1; }
+.tech .pipe { grid-column: 1 / -1; margin-top: 96px; display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr auto 1fr; gap: 20px; align-items: center; }
+.tech .pipe .card { padding: 40px 32px; display: flex; flex-direction: column; gap: 16px; min-height: 220px; justify-content: center; }
+.tech .arr { font-family: var(--display); font-size: 40px; color: var(--others); }
+.tech .foot { grid-column: 1 / 11; margin-top: 96px; }
 .close .soft-ink { color: var(--ink); max-width: 32ch; }
 .hook .left { grid-column: 1 / 8; padding-top: 96px; }
 .hook .art  { grid-column: 8 / -1; padding-top: 64px; }
@@ -249,15 +255,32 @@ body.dark [fill="#C2410C"] { fill: var(--orange-text); }
     <p class="label">Demo · final de 1500 m varones · NCAA 2025</p>
   </section>
 
-  <!-- 6 · IMPACTO Y FUTURO (después de la demo) -->
-  <section class="slide sol imp" data-t="2:30" data-note="(Nico vuelve a las láminas.) Hoy, un atleta y su entrenador ya pueden ver dónde se ganó y dónde se perdió una carrera grabada. Lo siguiente es un celular en la tribuna, en vivo, y datos que se comparan entre clubes, porque todas las pistas miden lo mismo. Y el sueño: cualquier deporte con cancha oficial, el velódromo, el patinaje, y verlo en AR desde donde estés. La cancha es la regla.">
+  <!-- 6 · LO QUE HAY DEBAJO (después de la demo) -->
+  <section class="slide tech" data-t="2:15" data-note="(Nico vuelve a las láminas.) Lo que vieron no es un mockup. Son cinco etapas: un detector de personas, un seguimiento que mantiene la identidad de cada corredor, un filtro de partículas que deduce qué tramo de la pista ve la cámara, un filtro de Kalman por atleta y simulaciones de Monte Carlo para pronosticar el final. Todo anclado a la geometría oficial de la pista.">
+    <h2 class="title">Del píxel al metro.</h2>
+    <div class="pipe">
+      <div class="card"><p class="label">Detección</p><p class="sec sec-s">RF-DETR</p></div>
+      <span class="arr" aria-hidden="true">→</span>
+      <div class="card"><p class="label">Seguimiento</p><p class="sec sec-s">ByteTrack</p></div>
+      <span class="arr" aria-hidden="true">→</span>
+      <div class="card"><p class="label">Zona de cámara</p><p class="sec sec-s">Filtro de partículas</p></div>
+      <span class="arr" aria-hidden="true">→</span>
+      <div class="card"><p class="label">Atletas</p><p class="sec sec-s">Kalman</p></div>
+      <span class="arr" aria-hidden="true">→</span>
+      <div class="card"><p class="label">Pronóstico</p><p class="sec sec-s">Monte Carlo</p></div>
+    </div>
+    <p class="sec sec-s soft foot">Visión, física y probabilidad, anclados a la geometría oficial de la pista.</p>
+  </section>
+
+  <!-- 7 · IMPACTO Y FUTURO (después de la demo) -->
+  <section class="slide sol imp" data-t="2:30" data-note="Hoy, un atleta y su entrenador ya pueden ver dónde se ganó y dónde se perdió una carrera grabada. Lo siguiente es un celular en la tribuna, en vivo, y datos que se comparan entre clubes, porque todas las pistas miden lo mismo. Y el sueño: cualquier deporte con cancha oficial, el velódromo, el patinaje, y verlo en AR desde donde estés. La cancha es la regla.">
     <h2 class="title">De una pista en Chile a cualquier cancha del mundo.</h2>
     <div class="card"><p class="sec">Hoy</p><p class="txt txt-s soft">El atleta y su entrenador ven dónde se ganó y dónde se perdió una carrera grabada.</p></div>
     <div class="card"><p class="sec">Lo siguiente</p><p class="txt txt-s soft">Un celular en la tribuna, en vivo. Datos comparables entre clubes.</p></div>
     <div class="card"><p class="sec">El sueño</p><p class="txt txt-s soft">Cualquier deporte con cancha oficial, y verlo en AR desde donde estés.</p></div>
   </section>
 
-  <!-- 7 · GRACIAS (receta 6) -->
+  <!-- 8 · GRACIAS (receta 6) -->
   <section class="slide close sky" data-t="2:45" data-note="Todo lo que pasa en la cancha, en datos para todos. Somos TRAZADA. Gracias.">
     <div class="brand"><svg viewBox="0 0 40 40" width="120" height="120" fill="none" stroke="#1D1D1F" stroke-linecap="round" stroke-width="3.6" aria-hidden="true"><path d="M4 6 H36"/><path d="M4 13 H8 A6 6 0 0 1 14 19 V36"/><path d="M36 13 H32 A6 6 0 0 0 26 19 V36"/><path d="M20 13 V36"/></svg>Trazada</div>
     <div>
@@ -406,7 +429,7 @@ body.dark [fill="#C2410C"] { fill: var(--orange-text); }
 
 <div class="clock" id="clock">0:00</div>
 <div class="notes" id="notes"></div>
-<div class="help" id="help">← → avanzar · F pantalla completa · N notas · T cronómetro · V demo de respaldo · A apéndice · D modo oscuro</div>
+<div class="help" id="help">← → avanzar · F pantalla completa · N notas · T cronómetro · V demo de respaldo · A apéndice · D modo claro/oscuro</div>
 
 <script>
 (() => {
@@ -468,7 +491,9 @@ body.dark [fill="#C2410C"] { fill: var(--orange-text); }
     this.outerHTML = '<span class="label">Falta docs/pitch/andres.jpg · foto de Andrés corriendo</span>';
   });
 
-  try { if (localStorage.getItem('trazada-tema') === 'oscuro') document.body.classList.add('dark'); } catch (e) {}
+  // Oscuro por defecto (proyector y pantalla compartida); la tecla D cambia y se recuerda.
+  let tema = null; try { tema = localStorage.getItem('trazada-tema'); } catch (e) {}
+  if (tema !== 'claro') document.body.classList.add('dark');
   const h = location.hash.slice(1);
   if (h === 'v') showingBackup = true; else if (+h >= 1) i = Math.min(main.length, +h) - 1;
   addEventListener('resize', fit); fit(); render();
