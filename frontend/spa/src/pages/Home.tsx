@@ -3,6 +3,7 @@ import { BarcodeScrubber } from '../components/trazada/BarcodeScrubber'
 import { CameraView } from '../components/trazada/CameraView'
 import { NarrationPanel } from '../components/trazada/NarrationPanel'
 import { RunnerList, RunnerStats } from '../components/trazada/RunnerList'
+import { TacticsPanel } from '../components/trazada/TacticsPanel'
 import { TopViewZoom } from '../components/trazada/TopViewZoom'
 import { UploadPanel } from '../components/trazada/UploadPanel'
 import { Button, Figure, PageTitle, Pending } from '../components/trazada/ui'
@@ -119,6 +120,9 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
 
       {/* key: al cambiar de video, el relato anterior se descarta sin efectos raros */}
       <NarrationPanel key={race.video.url} race={race} t={t} playing={playing} />
+
+      {/* Pronóstico y tácticas: un extra que se pide después de mostrar la carrera */}
+      <TacticsPanel key={`tactics-${race.video.url}`} race={race} t={t} selectedId={selectedId} onSelect={setSelectedId} />
 
       <div className="grid gap-[var(--section-gap)] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         {race.camera && (

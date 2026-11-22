@@ -22,5 +22,16 @@ class Track:
     def lap(self) -> float:
         return 2 * self.straight + 2 * self.curve_len
 
+    def in_curve(self, s: float) -> bool:
+        u = s % self.lap
+        c = self.curve_len
+        return u < c or c + self.straight <= u < 2 * c + self.straight
+
+    def extra_distance_rate(self, s: float, d: float) -> float:
+        """Metros recorridos por cada metro de progreso: > 1 en curva si va por fuera."""
+        if self.in_curve(s):
+            return (self.radius + d) / (self.radius + self.meas_offset)
+        return 1.0
+
 
 STANDARD = Track()

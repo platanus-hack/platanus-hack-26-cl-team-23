@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.athletes_router import router as athletes_router
 from app.api.health_router import router as health_router
 from app.api.narration_router import router as narration_router
+from app.api.tactics_router import router as tactics_router
 from app.api.tracking_router import router as tracking_router
 from app.api.zones_router import router as zones_router
 
@@ -12,3 +13,4 @@ api_router.include_router(narration_router)
 api_router.include_router(tracking_router)
 api_router.include_router(zones_router)
 api_router.include_router(athletes_router)
+api_router.include_router(tactics_router)

@@ -261,6 +261,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tactics/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tactics
+         * @description Pronóstico del final (P de ganar, de podio, llegada) y mejores momentos para adelantar.
+         */
+        post: operations["tactics_api_tactics__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -421,6 +441,85 @@ export interface components {
             /** Frames */
             frames: components["schemas"]["AthletesFrame"][];
         };
+        /** Attack */
+        Attack: {
+            /**
+             * Id
+             * @description Atleta que ataca
+             */
+            id: number;
+            /**
+             * Rival
+             * @description Atleta de adelante, al que pasaría
+             */
+            rival: number;
+            /**
+             * Action
+             * @description attack: la ventana está abierta ahora; wait: esperar a un punto más adelante; hold: no hay opción razonable, seguir a rebufo
+             * @enum {string}
+             */
+            action: "attack" | "wait" | "hold";
+            /**
+             * P Attack
+             * @description P(llegar antes que el rival) en el punto
+             */
+            p_attack: number;
+            /**
+             * P Now
+             * @description P(llegar antes que el rival) atacando ya
+             */
+            p_now: number;
+            /**
+             * At M
+             * @description Metros que le faltan al rival en el punto recomendado
+             */
+            at_m: number;
+            /**
+             * Zone
+             * @description Zona de la pista de ese punto (como en /zones)
+             */
+            zone: number;
+            /**
+             * Gap
+             * @description Metros que separan a los dos ahora
+             */
+            gap: number;
+            /**
+             * Remaining
+             * @description Metros que le faltan al rival ahora
+             */
+            remaining: number;
+            /**
+             * Window
+             * @description Ventana de ataque en metros que faltan al rival: (desde, hasta), desde >= hasta
+             */
+            window: number[];
+            /**
+             * Reserve
+             * @description Reserva de energía del atacante (0-1, mediana)
+             */
+            reserve: number;
+            /**
+             * Rival Reserve
+             * @description Reserva de energía del rival (0-1, mediana)
+             */
+            rival_reserve: number;
+            /**
+             * Draft M
+             * @description Metros que el atacante lleva a rebufo
+             */
+            draft_m: number;
+            /**
+             * Extra M
+             * @description Metros extra que cuesta pasar por fuera en ese punto
+             */
+            extra_m: number;
+            /**
+             * Curve
+             * @description [[metros que faltan, P(adelantar)], ...] de lejos a cerca de la meta
+             */
+            curve: number[][];
+        };
         /** Body_analyze_api_tracking_analyze_post */
         Body_analyze_api_tracking_analyze_post: {
             /**
@@ -537,6 +636,41 @@ export interface components {
             t: number;
             /** Dets */
             dets: number[][];
+        };
+        /** ForecastAthlete */
+        ForecastAthlete: {
+            /** Id */
+            id: number;
+            /**
+             * X
+             * @description Metros recorridos (extrapolados al instante del pronóstico)
+             */
+            x: number;
+            /**
+             * V
+             * @description Ritmo actual suavizado (m/s)
+             */
+            v: number;
+            /**
+             * Eta
+             * @description Llegada estimada en segundos de carrera (reloj desde el disparo): p10, p50, p90
+             */
+            eta: number[];
+            /**
+             * P Win
+             * @description Probabilidad de ganar entre los medidos
+             */
+            p_win: number;
+            /**
+             * P Podium
+             * @description Probabilidad de podio entre los medidos
+             */
+            p_podium: number;
+            /**
+             * Exp Rank
+             * @description Puesto esperado entre los medidos
+             */
+            exp_rank: number;
         };
         /**
          * GroupInput
@@ -740,6 +874,121 @@ export interface components {
              * @description Color de camiseta (re-identificación tras cortes)
              */
             jersey: number[] | null;
+        };
+        /** TacticsAthlete */
+        TacticsAthlete: {
+            /**
+             * Id
+             * @description Atleta (el mismo id de /api/athletes/)
+             */
+            id: number;
+            /**
+             * X
+             * @description Metros recorridos desde la salida
+             */
+            x: number;
+            /**
+             * V
+             * @description Velocidad respecto a la cancha (m/s)
+             */
+            v: number;
+            /**
+             * D
+             * @description Metros al bordillo
+             * @default 0
+             */
+            d: number;
+            /**
+             * Sigma X
+             * @description Incertidumbre de x (m)
+             * @default 0.5
+             */
+            sigma_x: number;
+        };
+        /** TacticsFrame */
+        TacticsFrame: {
+            /**
+             * T
+             * @description Segundos dentro del video
+             */
+            t: number;
+            /**
+             * Athletes
+             * @description Solo los medidos en este cuadro
+             */
+            athletes: components["schemas"]["TacticsAthlete"][];
+        };
+        /** TacticsRequest */
+        TacticsRequest: {
+            /**
+             * Source
+             * @default upload
+             */
+            source: string;
+            /**
+             * Distance
+             * @description Metros de la prueba (el mismo de /zones)
+             * @default 1500
+             */
+            distance: number;
+            /**
+             * T0
+             * @description Segundo del video en que suena el disparo
+             * @default 0
+             */
+            t0: number;
+            /**
+             * Every S
+             * @description Cada cuántos segundos se calcula un pronóstico
+             * @default 1
+             */
+            every_s: number;
+            /**
+             * Seed
+             * @default 0
+             */
+            seed: number;
+            /** Frames */
+            frames: components["schemas"]["TacticsFrame"][];
+        };
+        /** TacticsResult */
+        TacticsResult: {
+            /** Distance */
+            distance: number;
+            /** T0 */
+            t0: number;
+            /** Every S */
+            every_s: number;
+            /** Steps */
+            steps: components["schemas"]["TacticsStep"][];
+            /**
+             * Disclaimer
+             * @description Esto es un pronóstico de un modelo con parámetros supuestos, no una medición
+             */
+            disclaimer: string;
+        };
+        /** TacticsStep */
+        TacticsStep: {
+            /**
+             * T
+             * @description Segundo del video del pronóstico
+             */
+            t: number;
+            /**
+             * Winner
+             * @description Tiempo ganador pronosticado (s de carrera): p10, p50, p90
+             */
+            winner: number[] | null;
+            /**
+             * Athletes
+             * @description Por puesto esperado
+             */
+            athletes: components["schemas"]["ForecastAthlete"][];
+            /**
+             * Attacks
+             * @description Las mejores oportunidades, de mayor a menor P
+             */
+            attacks: components["schemas"]["Attack"][];
         };
         /** TrackFrameInput */
         TrackFrameInput: {
@@ -1408,6 +1657,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AthletesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tactics_api_tactics__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TacticsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TacticsResult"];
                 };
             };
             /** @description Validation Error */

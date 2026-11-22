@@ -12,6 +12,7 @@ from app.core.domain_errors import AuthenticationError
 from app.cv.detector import RoboflowDetector
 from app.services.athletes_service import AthletesService
 from app.services.narration_service import NarrationService
+from app.services.tactics_service import TacticsService
 from app.services.tracking_service import TrackingService
 from app.services.zones_service import ZonesService
 
@@ -61,6 +62,10 @@ def get_narration_service(
 
 def get_athletes_service() -> AthletesService:
     return AthletesService()
+
+
+def get_tactics_service() -> TacticsService:
+    return TacticsService()
 
 
 def require_demo_key(x_demo_key: Annotated[str | None, Header()] = None) -> None:

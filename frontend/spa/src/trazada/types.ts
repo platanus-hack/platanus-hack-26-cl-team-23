@@ -17,6 +17,12 @@ export type ZonesResult = components['schemas']['ZonesResult']
 /** `POST /api/athletes/` · posición y velocidad de cada atleta respecto a la cancha. */
 export type AthletesResult = components['schemas']['AthletesResult']
 
+/** `POST /api/tactics/` · pronóstico del final y mejores momentos para adelantar (un modelo, no una medición). */
+export type TacticsResult = components['schemas']['TacticsResult']
+export type TacticsStep = components['schemas']['TacticsStep']
+export type ForecastAthlete = components['schemas']['ForecastAthlete']
+export type Attack = components['schemas']['Attack']
+
 // =====================================================================
 // 2) Modelo INTERNO: lo único que conoce el dibujo. Todo lo de aquí sale
 //    de los contratos de arriba; no hay datos inventados.
