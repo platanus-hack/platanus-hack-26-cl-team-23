@@ -1,8 +1,8 @@
 """Contrato con el SPA: la cadena exacta que corre el navegador al subir un video.
 
-El front saca cuadros, los manda en lotes a /detect y /zones/features con los MISMOS
-archivos, y después cierra con una llamada a /track y otra a /zones/. El adaptador une
-ambos resultados por el número de cuadro, así que eso es lo que se verifica aquí.
+El front saca cuadros, los manda en lotes a /analyze (equivale a /detect y /zones/features
+sobre los MISMOS archivos), y después cierra con una llamada a /track y otra a /zones/. El
+adaptador une ambos resultados por el número de cuadro, así que eso es lo que se verifica aquí.
 """
 
 from collections.abc import Iterator
@@ -130,3 +130,54 @@ def test_zone_features_then_zones_share_the_frame_index(client: TestClient) -> N
     assert [f["t"] for f in body["frames"]] == [f["t"] for f in features]
     assert all(1 <= f["zone"] <= 6 for f in body["frames"])
     assert set(body["zone_names"]) == {"1", "2", "3", "4", "5", "6"}
+
+
+def test_analyze_equals_detect_plus_zone_features(client: TestClient) -> None:
+    """Una sola subida debe dar lo mismo que /detect y /zones/features por separado."""
+    batch = _batch(0, 6)
+    zone_files = batch["files"]
+
+    separate_detect = client.post("/api/tracking/detect", **batch)
+    separate_zones = client.post(
+        "/api/zones/features", files=zone_files, data={"t": batch["data"]["t"]}
+    )
+    assert separate_detect.status_code == 200, separate_detect.text
+    assert separate_zones.status_code == 200, separate_zones.text
+
+    client.app.dependency_overrides[get_detector_provider] = lambda: lambda: FakeDetector()
+    both = client.post("/api/tracking/analyze", **batch)
+
+    assert both.status_code == 200, both.text
+    body = both.json()
+    assert body["detect"] == separate_detect.json()
+    assert body["zones"] == separate_zones.json()
+
+
+def test_analyze_without_zones_skips_them(client: TestClient) -> None:
+    batch = _batch(0, 3)
+    batch["data"]["with_zones"] = False
+
+    response = client.post("/api/tracking/analyze", **batch)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body["detect"]["frames"]) == 3
+    assert body["zones"] is None
+
+
+def test_analyze_keeps_tracking_when_zones_fail(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services.zones_service import ZonesService
+
+    async def boom(self: ZonesService, images: list[bytes], times: list[float]) -> None:
+        raise RuntimeError("sin evidencia")
+
+    monkeypatch.setattr(ZonesService, "features", boom)
+
+    response = client.post("/api/tracking/analyze", **_batch(0, 3))
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body["detect"]["frames"]) == 3
+    assert body["zones"] is None

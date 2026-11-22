@@ -10,6 +10,8 @@ type Props = {
   race: Race
   frameIndex: number
   selectedId?: number
+  /** Llena el alto de su contenedor en vez de usar 16:9 (para el modal de zoom). */
+  fill?: boolean
 }
 
 const BAND = LANES * LANE
@@ -23,7 +25,7 @@ const HALF_H = R + BAND * K
  * dónde está mirando la cámara ahora (/api/zones/) y, si hay datos de atletas, un punto por
  * corredor en su posición (s, d) (/api/athletes/). El elegido va en naranja; el resto, en gris.
  */
-export function TopView({ race, frameIndex, selectedId }: Props) {
+export function TopView({ race, frameIndex, selectedId, fill = false }: Props) {
   const { ref, size } = useCanvas()
   const frame = race.frames[frameIndex]
 
@@ -150,7 +152,7 @@ export function TopView({ race, frameIndex, selectedId }: Props) {
   }, [race, frame, size, ref, selectedId])
 
   return (
-    <div className="relative aspect-[16/9] w-full overflow-hidden">
+    <div className={`relative w-full overflow-hidden ${fill ? 'h-full' : 'aspect-[16/9]'}`}>
       <canvas
         ref={ref}
         className="absolute inset-0 h-full w-full"

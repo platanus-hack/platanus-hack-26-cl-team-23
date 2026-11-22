@@ -1,7 +1,7 @@
 // Video subido por el usuario (arrastrar un archivo o pegar un enlace).
 //
 // Flujo: revisar duración → sacar cuadros → mandarlos al backend en lotes
-// (POST /api/tracking/detect, y de paso POST /api/zones/features con los MISMOS cuadros)
+// (POST /api/tracking/analyze: detección y evidencia de zonas con UNA sola subida por lote)
 // → una sola llamada a POST /api/tracking/track que devuelve el seguimiento con ids
 // → con esos ids y las zonas, POST /api/athletes/features (mismos cuadros, en lotes seguidos)
 //   y POST /api/athletes/: posición y velocidad de cada atleta.
@@ -17,8 +17,8 @@ import {
   measureAthletes,
   resolveAthletes,
 } from './athletes'
-import type { AthletesResult, DetectResponse, TrackingResult, ZonesResult } from './types'
-import { type ZoneOptions, collectZoneFeatures, resolveZones } from './zones'
+import type { AnalyzeResponse, AthletesResult, DetectResponse, TrackingResult, ZonesResult } from './types'
+import { type ZoneOptions, resolveZones } from './zones'
 
 /** Tope para la demo: una curva de 115 m a ritmo de medio fondo son ~16 s. */
 export const MAX_SECONDS = 20
@@ -111,6 +111,8 @@ export type ProcessOptions = {
   zones?: ZoneOptions
   /** Posición y velocidad por atleta. Necesita las zonas; si se omite, no se calculan. */
   athletes?: AthleteOptions
+  /** Seguimiento de los primeros lotes ya detectados, para ir mostrando el video mientras se procesa. */
+  onPartial?: (tracks: TrackingResult) => void
 }
 
 export type ProcessResult = { tracks: TrackingResult; zones?: ZonesResult; athletes?: AthletesResult }
@@ -120,7 +122,7 @@ export async function processVideo(
   src: string,
   info: VideoInfo,
   onProgress: (p: Progress) => void,
-  { signal, zones, athletes }: ProcessOptions = {},
+  { signal, zones, athletes, onPartial }: ProcessOptions = {},
 ): Promise<ProcessResult> {
   const total = Math.floor(info.duration * SAMPLE_FPS)
   if (total < 2) throw new UploadError('El video es demasiado corto para analizarlo.')
@@ -134,38 +136,58 @@ export async function processVideo(
   }
   if (signal?.aborted) throw new UploadError('Cancelado')
 
-  // 2) Detectar por lotes, en paralelo.
+  // 2) Detectar por lotes, en paralelo. Cada lote sube una sola vez: el mismo envío da las
+  // cajas y la evidencia de zonas.
   const batches: Frame[][] = []
   for (let i = 0; i < frames.length; i += BATCH) batches.push(frames.slice(i, i + BATCH))
 
   let done = 0
   let zonesOk = zones !== undefined
+  // Vista previa: ByteTrack es causal, así que correrlo sobre los primeros lotes ya listos da
+  // los mismos ids que tendrá el resultado final. Una sola corrida en vuelo a la vez.
+  const detectedBatches: (DetectResponse | undefined)[] = new Array(batches.length)
+  let previewed = 0
+  let previewing = false
+  let live = onPartial !== undefined
+  const preview = () => {
+    if (!live || previewing) return
+    let ready = 0
+    while (detectedBatches[ready]) ready++
+    if (ready === previewed) return
+    previewed = ready
+    previewing = true
+    const covered = detectedBatches.slice(0, ready).flatMap((d) => d!.frames)
+    apiPost<TrackingResult>('/tracking/track', trackRequest(info, covered), { signal })
+      .then((partial) => live && onPartial?.(partial))
+      .catch(() => {}) // es solo una vista previa
+      .finally(() => {
+        previewing = false
+        preview()
+      })
+  }
+
   onProgress({ phase: 'detecting', done, total: frames.length })
-  const results = await pool(batches, CONCURRENCY, async (batch) => {
-    const [detected, features] = await Promise.all([
-      retry(() => detectBatch(batch, info, signal)),
-      // Las zonas son un extra: si fallan, la carrera se arma igual con el seguimiento.
-      zones ? retry(() => collectZoneFeatures(batch, signal)).catch(() => undefined) : undefined,
-    ])
+  const results = await pool(batches, CONCURRENCY, async (batch, i) => {
+    const { detect, zones: features } = await retry(() => analyzeBatch(batch, info, zones !== undefined, signal))
+    // Las zonas son un extra: si faltan en algún lote, la carrera se arma igual con el seguimiento.
     if (zones && !features) zonesOk = false
     done += batch.length
     onProgress({ phase: 'detecting', done, total: frames.length })
-    return { detected, features }
+    detectedBatches[i] = detect
+    preview()
+    return { detected: detect, features }
   })
+  live = false
   if (signal?.aborted) throw new UploadError('Cancelado')
 
   // 3) Trackear todo de una vez: ByteTrack necesita la secuencia completa.
   onProgress({ phase: 'tracking', done: 0, total: 1 })
-  const detectedFrames = results.flatMap((r) => r.detected.frames)
   const tracks = await apiPost<TrackingResult>(
     '/tracking/track',
-    {
-      source: 'upload',
-      width: info.width,
-      height: info.height,
-      fps_out: SAMPLE_FPS,
-      frames: detectedFrames.map((f) => ({ t: f.t, dets: f.dets })),
-    },
+    trackRequest(
+      info,
+      results.flatMap((r) => r.detected.frames),
+    ),
     { signal },
   )
 
@@ -215,7 +237,23 @@ async function measure(
   )
 }
 
-function detectBatch(batch: Frame[], info: VideoInfo, signal?: AbortSignal): Promise<DetectResponse> {
+function trackRequest(info: VideoInfo, frames: DetectResponse['frames']) {
+  return {
+    source: 'upload',
+    width: info.width,
+    height: info.height,
+    fps_out: SAMPLE_FPS,
+    frames: frames.map((f) => ({ t: f.t, dets: f.dets })),
+  }
+}
+
+/** Detecta y, si se pide, saca la evidencia de zonas del lote: los cuadros viajan una sola vez. */
+function analyzeBatch(
+  batch: Frame[],
+  info: VideoInfo,
+  withZones: boolean,
+  signal?: AbortSignal,
+): Promise<AnalyzeResponse> {
   const form = new FormData()
   // Las cajas vuelven en píxeles del video original: el backend reescala con orig_*.
   for (const f of batch) {
@@ -224,7 +262,8 @@ function detectBatch(batch: Frame[], info: VideoInfo, signal?: AbortSignal): Pro
   }
   form.append('orig_width', String(info.width))
   form.append('orig_height', String(info.height))
-  return apiUpload<DetectResponse>('/tracking/detect', form, { signal })
+  form.append('with_zones', String(withZones))
+  return apiUpload<AnalyzeResponse>('/tracking/analyze', form, { signal })
 }
 
 /** El detector es serverless: un 502 o un 429 sueltos se reintentan una vez. */
@@ -240,12 +279,12 @@ async function retry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
 }
 
 /** Ejecuta `fn` sobre todos los items con como máximo `limit` en vuelo, conservando el orden. */
-async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+async function pool<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
   const out = new Array<R>(items.length)
   let next = 0
   await Promise.all(
     Array.from({ length: Math.min(limit, items.length) }, async () => {
-      for (let i = next++; i < items.length; i = next++) out[i] = await fn(items[i])
+      for (let i = next++; i < items.length; i = next++) out[i] = await fn(items[i], i)
     }),
   )
   return out

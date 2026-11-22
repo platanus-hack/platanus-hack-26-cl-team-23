@@ -247,13 +247,17 @@ Al subir un video, el navegador no sube el archivo: saca cuadros a 10 fps y mand
 
 ```
 extraer cuadros (10 fps, JPEG ≤960 px)
-  ├─ lotes de 24 ─► POST /api/tracking/detect   (cajas, en píxeles del video original)
-  └─ mismos lotes ─► POST /api/zones/features   (evidencia visual del encuadre)
+  └─ lotes de 24 ─► POST /api/tracking/analyze  (cajas en píxeles del video original
+                                                 + evidencia visual del encuadre: una sola subida)
 POST /api/tracking/track   ─► ids estables por corredor (ByteTrack)
 POST /api/zones/           ─► zona Z1..Z6 que enfoca la cámara en cada cuadro
 POST /api/athletes/features ─► (mismos cuadros + ids de /track) medición por cuadro: Δs y d
 POST /api/athletes/         ─► posición y velocidad de cada atleta (grupo + relativo al grupo)
 ```
+
+Mientras los lotes se detectan, el front corre `/tracking/track` sobre los primeros lotes ya listos
+(ByteTrack es causal: los ids coinciden con los del resultado final) y muestra el video con las cajas
+apareciendo, en vez de esperar al final. `/tracking/detect` y `/zones/features` siguen existiendo por separado.
 
 Los resultados se unen por el número de cuadro (`frames[].frame`, la posición en la lista
 enviada). Hasta tres lotes viajan en paralelo; las zonas y los atletas son extras: si fallan, la

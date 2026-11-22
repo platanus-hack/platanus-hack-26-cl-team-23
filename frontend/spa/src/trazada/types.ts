@@ -9,6 +9,7 @@ import type { Vec2 } from './geometry'
 /** `POST /api/tracking/track` · corredores seguidos (RF-DETR + ByteTrack). */
 export type TrackingResult = components['schemas']['TrackingResult']
 export type DetectResponse = components['schemas']['DetectResponse']
+export type AnalyzeResponse = components['schemas']['AnalyzeResponse']
 
 /** `POST /api/zones/` · en qué zona de la pista enfoca la cámara en cada cuadro. */
 export type ZonesResult = components['schemas']['ZonesResult']

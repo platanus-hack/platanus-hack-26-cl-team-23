@@ -2,6 +2,8 @@ from typing import Annotated, Self
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.schemas.zones import ZoneFeaturesResponse
+
 # [x1, y1, x2, y2, conf, on_track]: caja en píxeles del video, confianza del detector
 # y fracción (0-1) de color pista bajo los pies.
 RawDetection = Annotated[list[float], Field(min_length=6, max_length=6)]
@@ -62,6 +64,15 @@ class DetectedFrame(BaseModel):
 class DetectResponse(BaseModel):
     model: str
     frames: list[DetectedFrame]
+
+
+class AnalyzeResponse(BaseModel):
+    """/detect y /zones/features sobre el mismo lote, con una sola subida de frames."""
+
+    detect: DetectResponse
+    zones: ZoneFeaturesResponse | None = Field(
+        description="None si no se pidieron zonas o si fallaron: el seguimiento no depende de ellas"
+    )
 
 
 class TrackFrameInput(BaseModel):

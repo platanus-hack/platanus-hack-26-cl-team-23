@@ -176,6 +176,66 @@
         }
       }
     },
+    "/api/tracking/analyze": {
+      "post": {
+        "tags": [
+          "tracking"
+        ],
+        "summary": "Analyze",
+        "description": "/detect y /zones/features en una sola petici\u00f3n: cada frame viaja una vez, no dos.",
+        "operationId": "analyze_api_tracking_analyze_post",
+        "parameters": [
+          {
+            "name": "x-demo-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_analyze_api_tracking_analyze_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyzeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tracking/track": {
       "post": {
         "tags": [
@@ -535,6 +595,31 @@
   },
   "components": {
     "schemas": {
+      "AnalyzeResponse": {
+        "properties": {
+          "detect": {
+            "$ref": "#/components/schemas/DetectResponse"
+          },
+          "zones": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ZoneFeaturesResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None si no se pidieron zonas o si fallaron: el seguimiento no depende de ellas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detect",
+          "zones"
+        ],
+        "title": "AnalyzeResponse",
+        "description": "/detect y /zones/features sobre el mismo lote, con una sola subida de frames."
+      },
       "AthleteFeaturesResponse": {
         "properties": {
           "frames": {
@@ -825,6 +910,53 @@
           "frames"
         ],
         "title": "AthletesResult"
+      },
+      "Body_analyze_api_tracking_analyze_post": {
+        "properties": {
+          "frames": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Frames",
+            "description": "JPEG/PNG, uno por frame"
+          },
+          "t": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "T",
+            "description": "Segundos de cada frame, mismo orden"
+          },
+          "orig_width": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Orig Width",
+            "description": "Ancho del video original"
+          },
+          "orig_height": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Orig Height",
+            "description": "Alto del video original"
+          },
+          "with_zones": {
+            "type": "boolean",
+            "title": "With Zones",
+            "description": "Tambi\u00e9n evidencia de zonas",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "frames",
+          "t",
+          "orig_width",
+          "orig_height"
+        ],
+        "title": "Body_analyze_api_tracking_analyze_post"
       },
       "Body_detect_api_tracking_detect_post": {
         "properties": {
