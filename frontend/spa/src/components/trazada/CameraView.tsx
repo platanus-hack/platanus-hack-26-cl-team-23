@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { pill } from '../../trazada/draw'
 import { themeColor, themeFont } from '../../trazada/format'
+import { useTheme } from '../../trazada/theme'
 import { visibleAt } from '../../trazada/adapter'
 import type { Race } from '../../trazada/types'
 import { useCanvas } from '../../trazada/useCanvas'
@@ -21,6 +22,7 @@ type Props = {
  */
 export function CameraView({ race, frameIndex, t, playing, showOverlay, selectedId, onSelect }: Props) {
   const { ref, size } = useCanvas()
+  const theme = useTheme() // al cambiar el tema, se vuelven a leer los colores
   const videoRef = useRef<HTMLVideoElement>(null)
   const frame = race.frames[frameIndex]
 
@@ -91,7 +93,7 @@ export function CameraView({ race, frameIndex, t, playing, showOverlay, selected
         bg: isSel ? pick : themeColor('surface'),
       })
     }
-  }, [race, frame, frameIndex, showOverlay, selectedId, size, ref])
+  }, [race, frame, frameIndex, showOverlay, selectedId, size, ref, theme])
 
   // Clic sobre un corredor → elegirlo.
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {

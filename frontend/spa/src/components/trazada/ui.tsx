@@ -56,7 +56,7 @@ export function PageTitle({ title, lede, facts }: { title: ReactNode; lede?: Rea
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'quiet' }
 
 export function Button({ variant = 'quiet', className = '', ...rest }: ButtonProps) {
-  const look = variant === 'primary' ? 'bg-accent text-white hover:bg-fg' : 'bg-paper2 text-fg hover:bg-line'
+  const look = variant === 'primary' ? 'bg-accent text-white hover:bg-fg hover:text-bg' : 'bg-paper2 text-fg hover:bg-line'
   return (
     <button
       type="button"

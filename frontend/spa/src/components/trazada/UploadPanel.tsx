@@ -332,7 +332,7 @@ function FrameGrid({ progress }: { progress: Progress }) {
           >
             <span
               className={`h-[55%] w-[1.5px] rounded-full transition-transform duration-500 ease-[var(--ease-out)] ${
-                isDetected ? '-rotate-45 bg-white' : 'rotate-45 bg-other'
+                isDetected ? '-rotate-45 bg-bg' : 'rotate-45 bg-other'
               }`}
             />
           </span>

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { LANE, LANES, LAP, R, STRAIGHT, trackToWorld, type Vec2 } from '../../trazada/geometry'
 import { polyline, range } from '../../trazada/draw'
 import { fmtNum, themeColor, themeFont } from '../../trazada/format'
+import { useTheme } from '../../trazada/theme'
 import { startS } from '../../trazada/pruebas'
 import type { Race } from '../../trazada/types'
 import { useCanvas } from '../../trazada/useCanvas'
@@ -27,6 +28,7 @@ const HALF_H = R + BAND * K
  */
 export function TopView({ race, frameIndex, selectedId, fill = false }: Props) {
   const { ref, size } = useCanvas()
+  const theme = useTheme() // al cambiar el tema, se vuelven a leer los colores
   const frame = race.frames[frameIndex]
 
   useEffect(() => {
@@ -149,7 +151,7 @@ export function TopView({ race, frameIndex, selectedId, fill = false }: Props) {
       }
       ctx.restore()
     }
-  }, [race, frame, size, ref, selectedId])
+  }, [race, frame, size, ref, selectedId, theme])
 
   return (
     <div className={`relative w-full overflow-hidden ${fill ? 'h-full' : 'aspect-[16/9]'}`}>
