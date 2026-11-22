@@ -29,15 +29,15 @@ type Props = {
 
 const PHASE_LABEL: Record<Progress['phase'], string> = {
   extracting: 'sacando cuadros del video',
-  detecting: 'buscando corredores',
+  detecting: 'sacando cuadros y buscando corredores',
   tracking: 'siguiendo a cada corredor',
   measuring: 'midiendo posición y velocidad',
 }
 
-/** Las fases pesan distinto: detectar es lo lento (va contra el servidor). */
+/** Las fases pesan distinto: detectar es lo lento (va contra el servidor) y incluye la extracción. */
 const PHASE_RANGE: Record<Progress['phase'], [number, number]> = {
-  extracting: [0, 0.3],
-  detecting: [0.3, 0.75],
+  extracting: [0, 0],
+  detecting: [0, 0.75],
   tracking: [0.75, 0.8],
   measuring: [0.8, 1],
 }
@@ -313,7 +313,8 @@ function FrameGrid({ progress }: { progress: Progress }) {
   const [n, setN] = useState(1)
   const latest = progress.phase !== 'tracking' ? Math.max(1, progress.total) : n
   if (latest !== n) setN(latest) // ajustar estado durante el render: patrón recomendado por React
-  const extracted = progress.phase === 'extracting' ? progress.done : n
+  const extracted =
+    progress.phase === 'extracting' ? progress.done : progress.phase === 'detecting' ? (progress.extracted ?? n) : n
   const detected = progress.phase === 'detecting' ? progress.done : progress.phase === 'tracking' ? n : 0
   const fresh = Math.max(0, detected - 24)
   return (

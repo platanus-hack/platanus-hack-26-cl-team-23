@@ -53,12 +53,16 @@ async def analyze(
     orig_width: Annotated[int, Form(gt=0, description="Ancho del video original")],
     orig_height: Annotated[int, Form(gt=0, description="Alto del video original")],
     with_zones: Annotated[bool, Form(description="También evidencia de zonas")] = True,
+    want_desc: Annotated[
+        list[bool] | None,
+        Form(description="Por frame: ¿calcular apariencia y curvatura de zonas? Sin él, todos"),
+    ] = None,
 ) -> AnalyzeResponse:
     """/detect y /zones/features en una sola petición: cada frame viaja una vez, no dos."""
     images = [await frame.read() for frame in frames]
     detect, zones = await asyncio.gather(
         service.detect_batch(images, t, orig_width, orig_height),
-        zones_service.features(images, t) if with_zones else _none(),
+        zones_service.features(images, t, want_desc) if with_zones else _none(),
         return_exceptions=True,
     )
     if isinstance(detect, BaseException):

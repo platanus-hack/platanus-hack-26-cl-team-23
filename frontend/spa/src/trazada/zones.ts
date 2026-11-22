@@ -24,6 +24,19 @@ export type ZoneOptions = {
 /** La apariencia y la curvatura solo hacen falta cada ~0,5 s; el histograma, en todos. */
 const DESC_EVERY_S = 0.5
 
+/**
+ * En qué cuadros hace falta la apariencia y la curvatura. Se manda al backend junto con los
+ * cuadros para que no calcule (lo más caro del módulo) lo que de todos modos no se usa.
+ */
+export function wantDescFlags(times: number[]): boolean[] {
+  let nextSample = -Infinity
+  return times.map((t) => {
+    const want = t >= nextSample
+    if (want) nextSample = t + DESC_EVERY_S
+    return want
+  })
+}
+
 /** Filtro de zonas sobre todas las features acumuladas. */
 export async function resolveZones(
   features: ZoneFeaturesResponse['frames'],
@@ -32,14 +45,11 @@ export async function resolveZones(
 ): Promise<ZonesResult | undefined> {
   if (features.length === 0) return undefined
 
-  let nextSample = -Infinity
-  const frames: ZoneFeaturesInput[] = features.map((f) => {
-    const withDesc = f.t >= nextSample
-    if (withDesc) nextSample = f.t + DESC_EVERY_S
-    return withDesc
+  const frames: ZoneFeaturesInput[] = features.map((f) =>
+    f.desc && f.bend != null && f.chord != null && f.n != null
       ? { t: f.t, hist: f.hist, desc: f.desc, bend: f.bend, chord: f.chord, n: f.n }
-      : { t: f.t, hist: f.hist }
-  })
+      : { t: f.t, hist: f.hist },
+  )
 
   return apiPost<ZonesResult>(
     '/zones/', // el slash final importa: sin él hay un 307 que puede perder el cuerpo

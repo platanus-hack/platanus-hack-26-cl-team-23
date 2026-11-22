@@ -30,12 +30,22 @@ def _round(values: np.ndarray) -> list[float]:
 
 
 class ZonesService:
-    async def features(self, images: list[bytes], times: list[float]) -> ZoneFeaturesResponse:
-        """Evidencia visual de un lote de frames (sin estado): corte, apariencia y curvatura."""
+    async def features(
+        self,
+        images: list[bytes],
+        times: list[float],
+        want_desc: list[bool] | None = None,
+    ) -> ZoneFeaturesResponse:
+        """Evidencia visual de un lote de frames (sin estado): corte, apariencia y curvatura.
+
+        `want_desc` (uno por frame) marca en cuáles calcular apariencia y curvatura, que es lo
+        caro; en los demás solo va el histograma. Sin él se calcula todo."""
         if not images:
             raise ValidationDomainError("Envía al menos un frame")
         if len(images) != len(times):
             raise ValidationDomainError("Debe haber un 't' por cada frame")
+        if want_desc is not None and len(want_desc) != len(images):
+            raise ValidationDomainError("Debe haber un 'want_desc' por cada frame")
         if len(images) > MAX_BATCH_FRAMES:
             raise ValidationDomainError(f"Máximo {MAX_BATCH_FRAMES} frames por petición")
         if any(len(img) > MAX_FRAME_BYTES for img in images):
@@ -43,15 +53,18 @@ class ZonesService:
 
         def work() -> list[ZoneFeatures]:
             out = []
-            for img, t in zip(images, times, strict=True):
-                feats = pipeline.frame_features(_decode_jpeg(img))
+            for i, (img, t) in enumerate(zip(images, times, strict=True)):
+                feats = pipeline.frame_features(
+                    _decode_jpeg(img), full=want_desc is None or want_desc[i]
+                )
+                full = feats["desc"] is not None
                 out.append(
                     ZoneFeatures(
                         t=t,
                         hist=_round(feats["hist"]),
-                        desc=_round(feats["desc"]),
-                        bend=round(feats["bend"], 5),
-                        chord=round(feats["chord"], 1),
+                        desc=_round(feats["desc"]) if full else None,
+                        bend=round(feats["bend"], 5) if full else None,
+                        chord=round(feats["chord"], 1) if full else None,
                         n=feats["n"],
                     )
                 )

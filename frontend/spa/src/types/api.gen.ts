@@ -449,6 +449,11 @@ export interface components {
              * @default true
              */
             with_zones: boolean;
+            /**
+             * Want Desc
+             * @description Por frame: ¿calcular apariencia y curvatura de zonas? Sin él, todos
+             */
+            want_desc?: boolean[] | null;
         };
         /** Body_detect_api_tracking_detect_post */
         Body_detect_api_tracking_detect_post: {
@@ -513,6 +518,11 @@ export interface components {
              * @description Segundos de cada frame, mismo orden
              */
             t: number[];
+            /**
+             * Want Desc
+             * @description Por frame: ¿calcular apariencia y curvatura? Sin él, todos
+             */
+            want_desc?: boolean[] | null;
         };
         /** DetectResponse */
         DetectResponse: {
@@ -847,22 +857,22 @@ export interface components {
              * Desc
              * @description Descriptor de apariencia (memoria de cámaras)
              */
-            desc: number[];
+            desc?: number[] | null;
             /**
              * Bend
              * @description Flecha/cuerda de las líneas pintadas (curvatura)
              */
-            bend: number;
+            bend?: number | null;
             /**
              * Chord
              * @description Largo total de líneas medidas (px en 1280x720)
              */
-            chord: number;
+            chord?: number | null;
             /**
              * N
              * @description Trazos de línea usados
              */
-            n: number;
+            n?: number | null;
         };
         /**
          * ZoneFeaturesInput

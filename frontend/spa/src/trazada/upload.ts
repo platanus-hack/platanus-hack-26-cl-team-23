@@ -8,7 +8,8 @@
 // El video nunca se sube: solo viajan los cuadros, ya reescalados.
 //
 // Se procesa ANTES de reproducir, para que en el escenario se vea fluido; igual es
-// causal, cada cuadro solo usa los anteriores.
+// causal, cada cuadro solo usa los anteriores. La extracción y la detección van solapadas:
+// los lotes salen hacia el backend mientras se siguen sacando cuadros.
 
 import { ApiError, apiPost, apiUpload } from '../lib/api'
 import {
@@ -18,7 +19,7 @@ import {
   resolveAthletes,
 } from './athletes'
 import type { AnalyzeResponse, AthletesResult, DetectResponse, TrackingResult, ZonesResult } from './types'
-import { type ZoneOptions, resolveZones } from './zones'
+import { type ZoneOptions, resolveZones, wantDescFlags } from './zones'
 
 /** Tope para la demo: una curva de 115 m a ritmo de medio fondo son ~16 s. */
 export const MAX_SECONDS = 20
@@ -98,12 +99,15 @@ function encode(canvas: HTMLCanvasElement, quality: number): Blob {
     throw new UploadError('Ese enlace no deja leer sus cuadros. Descarga el video y arrástralo aquí.')
   }
   const [head, b64] = dataUrl.split(',')
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
   return new Blob([bytes], { type: head.slice(5, head.indexOf(';')) })
 }
 
 export type Phase = 'extracting' | 'detecting' | 'tracking' | 'measuring'
-export type Progress = { phase: Phase; done: number; total: number }
+/** `extracted`: en la fase `detecting` la extracción sigue en marcha; cuántos cuadros van. */
+export type Progress = { phase: Phase; done: number; total: number; extracted?: number }
 
 export type ProcessOptions = {
   signal?: AbortSignal
@@ -127,25 +131,18 @@ export async function processVideo(
   const total = Math.floor(info.duration * SAMPLE_FPS)
   if (total < 2) throw new UploadError('El video es demasiado corto para analizarlo.')
 
-  // 1) Extraer. Un solo pase: los mismos JPEG alimentan al detector y a las zonas.
-  onProgress({ phase: 'extracting', done: 0, total })
-  const frames: Frame[] = []
-  for await (const f of extractFrames(src, info, signal)) {
-    frames.push(f)
-    onProgress({ phase: 'extracting', done: frames.length, total })
-  }
-  if (signal?.aborted) throw new UploadError('Cancelado')
-
-  // 2) Detectar por lotes, en paralelo. Cada lote sube una sola vez: el mismo envío da las
-  // cajas y la evidencia de zonas.
-  const batches: Frame[][] = []
-  for (let i = 0; i < frames.length; i += BATCH) batches.push(frames.slice(i, i + BATCH))
+  // 1) y 2) Extraer y detectar a la vez: cada lote sale hacia el detector apenas está completo,
+  // sin esperar a que se saquen todos los cuadros. Los mismos JPEG alimentan al detector y a
+  // las zonas, y cada lote sube una sola vez: el mismo envío da las cajas y la evidencia.
+  const wantDesc = zones ? wantDescFlags(Array.from({ length: total }, (_, i) => i / SAMPLE_FPS)) : undefined
 
   let done = 0
+  let extracted = 0
+  const emit = () => onProgress({ phase: 'detecting', done, total, extracted })
   let zonesOk = zones !== undefined
   // Vista previa: ByteTrack es causal, así que correrlo sobre los primeros lotes ya listos da
   // los mismos ids que tendrá el resultado final. Una sola corrida en vuelo a la vez.
-  const detectedBatches: (DetectResponse | undefined)[] = new Array(batches.length)
+  const detectedBatches: (DetectResponse | undefined)[] = []
   let previewed = 0
   let previewing = false
   let live = onPartial !== undefined
@@ -166,18 +163,44 @@ export async function processVideo(
       })
   }
 
-  onProgress({ phase: 'detecting', done, total: frames.length })
-  const results = await pool(batches, CONCURRENCY, async (batch, i) => {
-    const { detect, zones: features } = await retry(() => analyzeBatch(batch, info, zones !== undefined, signal))
+  const sink = streamPool(CONCURRENCY, async (batch: Frame[], i) => {
+    const { detect, zones: features } = await retry(() =>
+      analyzeBatch(batch, info, zones !== undefined, wantDesc, signal),
+    )
     // Las zonas son un extra: si faltan en algún lote, la carrera se arma igual con el seguimiento.
     if (zones && !features) zonesOk = false
     done += batch.length
-    onProgress({ phase: 'detecting', done, total: frames.length })
+    emit()
     detectedBatches[i] = detect
     preview()
     return { detected: detect, features }
   })
-  live = false
+
+  emit()
+  const frames: Frame[] = []
+  let current: Frame[] = []
+  for await (const f of extractFrames(src, info, signal)) {
+    if (sink.failed) break
+    frames.push(f)
+    current.push(f)
+    extracted = frames.length
+    if (current.length === BATCH) {
+      sink.push(current)
+      current = []
+    }
+    emit()
+  }
+  if (current.length > 0 && !sink.failed) sink.push(current)
+
+  let results: Awaited<ReturnType<typeof sink.finish>>
+  try {
+    results = await sink.finish()
+  } catch (e) {
+    if (signal?.aborted) throw new UploadError('Cancelado')
+    throw e
+  } finally {
+    live = false
+  }
   if (signal?.aborted) throw new UploadError('Cancelado')
 
   // 3) Trackear todo de una vez: ByteTrack necesita la secuencia completa.
@@ -191,33 +214,33 @@ export async function processVideo(
     { signal },
   )
 
-  // Solo sirven si están TODOS los lotes: el filtro une zonas y seguimiento por el número
-  // de cuadro, y un hueco correría los índices.
-  const zoneResult =
-    zones && zonesOk
-      ? await resolveZones(results.flatMap((r) => r.features!.frames), zones, signal).catch(() => undefined)
-      : undefined
-
   onProgress({ phase: 'tracking', done: 1, total: 1 })
 
-  // 4) Atletas: es un extra, igual que las zonas. Si algo falla se muestra lo demás.
+  // 4) Zonas y atletas son extras: si algo falla se muestra lo demás. La medición por cuadro
+  // solo necesita las cajas con id, no las zonas: corren a la vez y se unen al final.
+  // Solo sirven si están TODOS los lotes: el filtro une zonas y seguimiento por el número
+  // de cuadro, y un hueco correría los índices.
+  const [zoneResult, measured] = await Promise.all([
+    zones && zonesOk
+      ? resolveZones(results.flatMap((r) => r.features!.frames), zones, signal).catch(() => undefined)
+      : undefined,
+    athletes && zones && zonesOk ? measure(frames, tracks, onProgress, signal).catch(() => undefined) : undefined,
+  ])
   const athleteResult =
-    athletes && zoneResult && zoneResult.frames.length === frames.length
-      ? await measure(frames, tracks, zoneResult, athletes, onProgress, signal).catch(() => undefined)
+    athletes && zoneResult && measured && zoneResult.frames.length === frames.length
+      ? await resolveAthletes(measured, zoneResult, athletes, signal).catch(() => undefined)
       : undefined
 
   return { tracks, zones: zoneResult, athletes: athleteResult }
 }
 
-/** Mide a cada atleta: lotes de cuadros seguidos en paralelo, y un filtro final con el grupo. */
+/** Mide a cada atleta: lotes de cuadros seguidos en paralelo. */
 async function measure(
   frames: Frame[],
   tracks: TrackingResult,
-  zones: ZonesResult,
-  options: AthleteOptions,
   onProgress: (p: Progress) => void,
   signal?: AbortSignal,
-): Promise<AthletesResult> {
+) {
   const batches: Frame[][] = []
   for (let i = 0; i < frames.length; i += ATHLETE_BATCH) batches.push(frames.slice(i, i + ATHLETE_BATCH))
 
@@ -229,12 +252,7 @@ async function measure(
     onProgress({ phase: 'measuring', done, total: frames.length })
     return measured
   })
-  return resolveAthletes(
-    results.flatMap((r) => r.frames),
-    zones,
-    options,
-    signal,
-  )
+  return results.flatMap((r) => r.frames)
 }
 
 function trackRequest(info: VideoInfo, frames: DetectResponse['frames']) {
@@ -252,6 +270,7 @@ function analyzeBatch(
   batch: Frame[],
   info: VideoInfo,
   withZones: boolean,
+  wantDesc: boolean[] | undefined,
   signal?: AbortSignal,
 ): Promise<AnalyzeResponse> {
   const form = new FormData()
@@ -259,6 +278,7 @@ function analyzeBatch(
   for (const f of batch) {
     form.append('frames', f.jpeg, `f${f.index}.jpg`)
     form.append('t', String(f.t))
+    if (withZones && wantDesc) form.append('want_desc', String(wantDesc[f.index]))
   }
   form.append('orig_width', String(info.width))
   form.append('orig_height', String(info.height))
@@ -288,4 +308,56 @@ async function pool<T, R>(items: T[], limit: number, fn: (item: T, index: number
     }),
   )
   return out
+}
+
+/**
+ * Como `pool`, pero los items se van agregando con `push` mientras ya se procesan (por ejemplo,
+ * lotes que salen a medida que se extraen cuadros). `finish` espera el resto y devuelve los
+ * resultados en el orden de `push`. Si un item falla, `failed` pasa a true y `finish` lanza.
+ */
+function streamPool<T, R>(limit: number, fn: (item: T, index: number) => Promise<R>) {
+  const queue: [T, number][] = []
+  const out: R[] = []
+  const waiting: (() => void)[] = []
+  let count = 0
+  let closed = false
+  let failed = false
+  const wake = () => waiting.splice(0).forEach((resolve) => resolve())
+
+  const workers = Array.from({ length: limit }, async () => {
+    try {
+      for (;;) {
+        const next = queue.shift()
+        if (next) {
+          out[next[1]] = await fn(next[0], next[1])
+        } else if (closed || failed) {
+          return
+        } else {
+          await new Promise<void>((resolve) => waiting.push(resolve))
+        }
+      }
+    } catch (e) {
+      failed = true
+      wake()
+      throw e
+    }
+  })
+  const all = Promise.all(workers)
+  all.catch(() => {}) // se relanza en finish(); esto evita un rechazo sin atender mientras tanto
+
+  return {
+    push(item: T) {
+      queue.push([item, count++])
+      wake()
+    },
+    get failed() {
+      return failed
+    },
+    async finish(): Promise<R[]> {
+      closed = true
+      wake()
+      await all
+      return out
+    },
+  }
 }

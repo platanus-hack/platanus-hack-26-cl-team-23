@@ -39,10 +39,11 @@ JERSEY_SIZE = JERSEY_BINS[0] * JERSEY_BINS[1]
 
 
 def _hsv_masks(frame: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    h, s, v = cv2.split(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV))
+    """(máscara de tartán rojo, frame en HSV)."""
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
     red = (((h < 14) | (h > 165)) & (s > 70) & (v > 60)).astype(np.uint8)
-    grass = ((h > 33) & (h < 90) & (s > 50) & (v > 40)).astype(np.uint8)
-    return red, grass
+    return red, hsv
 
 
 # ------------------------------------------------------------------ ¿quién es corredor?
@@ -108,18 +109,10 @@ def long_segments_direction(mask, top: int = 0, min_len: int = 90) -> float | No
 
 
 # ------------------------------------------------------------------ lateral
-def _crossings(m: np.ndarray) -> list[float]:
-    out, k = [], 0
-    while k < len(m):
-        if m[k]:
-            j = k
-            while j + 1 < len(m) and m[j + 1]:
-                j += 1
-            out.append((k + j) / 2)
-            k = j + 1
-        else:
-            k += 1
-    return out
+def _crossings(m: np.ndarray) -> np.ndarray:
+    """Centro de cada tramo seguido de True."""
+    edges = np.diff(np.concatenate(([0], m.astype(np.int8), [0])))
+    return (np.flatnonzero(edges == 1) + np.flatnonzero(edges == -1) - 1) / 2
 
 
 def lateral_measure(mask, red, excl_mask, foot, phi, ppm, n_scans: int = 5) -> dict | None:
@@ -211,6 +204,10 @@ def lateral_measure(mask, red, excl_mask, foot, phi, ppm, n_scans: int = 5) -> d
 _AL = np.radians(np.arange(-89.5, 90, 1.0))
 _K = np.exp(np.linspace(np.log(0.04), np.log(0.9), 40))
 _AG, _KG = np.meshgrid(_AL, _K, indexing="ij")
+# lo que no depende de la observación se calcula una sola vez
+_PHI_P = np.arctan2(_KG * np.sin(_AG), np.cos(_AG))
+_LOG_KG = np.log(_KG)
+_SIG_DEN = np.sqrt(np.cos(_AG) ** 2 + _KG**2 * np.sin(_AG) ** 2)
 
 
 def fit_view(phi: float, ppm: float, sigma: float | None = None, k_prior: float = 0.25):
@@ -220,11 +217,10 @@ def fit_view(phi: float, ppm: float, sigma: float | None = None, k_prior: float 
     Observa la dirección de las líneas (φ) y, si se ve, el espaciado entre calles medido
     perpendicular a ellas (σ px/m). Ajuste por grilla con prior suave sobre k (cámaras de TV
     elevadas 5-35°): con mediciones ruidosas la solución cerrada se sale de rango."""
-    phi_p = np.arctan2(_KG * np.sin(_AG), np.cos(_AG))
-    dphi = (phi_p - phi + np.pi / 2) % np.pi - np.pi / 2
-    cost = (dphi / 0.06) ** 2 + ((np.log(_KG) - np.log(k_prior)) / 1.5) ** 2
+    dphi = (_PHI_P - phi + np.pi / 2) % np.pi - np.pi / 2
+    cost = (dphi / 0.06) ** 2 + ((_LOG_KG - np.log(k_prior)) / 1.5) ** 2
     if sigma:
-        sig_p = ppm * _KG / np.sqrt(np.cos(_AG) ** 2 + _KG**2 * np.sin(_AG) ** 2)
+        sig_p = ppm * _KG / _SIG_DEN
         cost = cost + ((np.log(sig_p) - np.log(sigma)) / 0.25) ** 2
     i = np.unravel_index(np.argmin(cost), cost.shape)
     return float(_AG[i]), float(_KG[i])
@@ -298,7 +294,7 @@ def measure_frame(frame: np.ndarray, boxes: np.ndarray) -> tuple[FrameGeometry |
             frame, (WORK_W, round(frame.shape[0] * scale)), interpolation=cv2.INTER_AREA
         )
     bx = np.asarray(boxes, float)[:, :4] * scale
-    red, _ = _hsv_masks(frame)
+    red, hsv = _hsv_masks(frame)
     runners = select_runners(bx, red)
     if len(runners) == 0:
         return None, []
@@ -311,7 +307,7 @@ def measure_frame(frame: np.ndarray, boxes: np.ndarray) -> tuple[FrameGeometry |
         return max(5.0, a_ + b_ * y)
 
     excl = [tuple(x) for x in b] + IGNORE_TV
-    mask = line_mask(frame, ignore=[tuple(int(v) for v in x) for x in excl])
+    mask = line_mask(frame, ignore=[tuple(int(v) for v in x) for x in excl], hsv=hsv)
     # de cerca una línea (5 cm) es más ancha que la ventana de line_mask y sale como dos bordes
     kc = int(np.clip(0.12 * ppm_of(float(np.median(feet[:, 1]))), 1, 25)) | 1
     mask = cv2.morphologyEx(
@@ -324,7 +320,11 @@ def measure_frame(frame: np.ndarray, boxes: np.ndarray) -> tuple[FrameGeometry |
     phis = [local_direction(mask, f, int(max(60, 2.5 * ppm_of(f[1]))), excl) for f in feet]
     valid = [(p, c) for p, c in phis if p is not None and c > 0.3]
     close_up = float(np.median(hts)) > CLOSE_UP_PX
-    phi_long = long_segments_direction(mask, top=int(feet[:, 1].min() - 0.3 * np.median(hts)))
+    top_long = int(feet[:, 1].min() - 0.3 * np.median(hts))
+
+    def phi_long() -> float | None:  # Hough es caro: solo se calcula si hace falta
+        return long_segments_direction(mask, top=top_long)
+
     blind = False
     if close_up:
         # de cerca los cuerpos tapan las calles y junto a los pies dominan marcas transversales:
@@ -335,11 +335,16 @@ def measure_frame(frame: np.ndarray, boxes: np.ndarray) -> tuple[FrameGeometry |
             valid = steep
         else:
             blind = True
-            valid = valid or loose or [(phi_long if phi_long is not None else 0.0, 1.0)]
+            if not (valid or loose):
+                pl = phi_long()
+                valid = [(pl if pl is not None else 0.0, 1.0)]
+            else:
+                valid = valid or loose
     if not valid:
-        if phi_long is None:
+        pl = phi_long()
+        if pl is None:
             return None, []
-        valid = [(phi_long, 1.0)]
+        valid = [(pl, 1.0)]
     P = np.array([p for p, _ in valid])
     C = np.array([c for _, c in valid])
     phi_g = 0.5 * math.atan2(np.sum(C * np.sin(2 * P)), np.sum(C * np.cos(2 * P)))
@@ -359,11 +364,13 @@ def measure_frame(frame: np.ndarray, boxes: np.ndarray) -> tuple[FrameGeometry |
     )
 
     c = np.median(feet, 0)
-    dd_rel = []
+    dd_rel, ds_rel, a_s_norm = [], [], []
     for f in feet:
         a_s, a_d = geo.jacobian((f[1] + c[1]) / 2)
         sol, *_ = np.linalg.lstsq(np.stack([a_s, a_d], 1), f - c, rcond=None)
+        ds_rel.append(float(sol[0]))
         dd_rel.append(float(sol[1]))
+        a_s_norm.append(float(np.linalg.norm(a_s)))
     dd_rel_arr = np.array(dd_rel)
     have = [j for j, lm in enumerate(lat) if lm and lm.get("d") is not None and -0.5 < lm["d"] < 11]
     sgn, off = 1.0, None
@@ -379,12 +386,10 @@ def measure_frame(frame: np.ndarray, boxes: np.ndarray) -> tuple[FrameGeometry |
         sd = lm["sigma_d"] if d is not None else None
         if d is None and off is not None:
             d, sd = off + sgn * dd_rel_arr[j], 0.8 + 0.4 * abs(dd_rel_arr[j])
-        a_s, a_d = geo.jacobian((f[1] + c[1]) / 2)
-        sol, *_ = np.linalg.lstsq(np.stack([a_s, a_d], 1), f - c, rcond=None)
-        ds = float(sol[0])
+        ds = ds_rel[j]
         # zancada (±~12 % del alto), escala del cuerpo (±5 %) y escorzo incierto de frente
         sds = (
-            0.12 * hts[j] / max(1e-6, float(np.linalg.norm(a_s)))
+            0.12 * hts[j] / max(1e-6, a_s_norm[j])
             + 0.05 * abs(ds)
             + 0.15
             + 0.5 * abs(ds) * (1 - abs(math.cos(alpha)))

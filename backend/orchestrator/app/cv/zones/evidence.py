@@ -156,9 +156,14 @@ class CameraMemory:
 
 
 # ------------------------------------------------------------------ curvatura
-def line_mask(frame: np.ndarray, ignore: Sequence[tuple[int, int, int, int]] = ()) -> np.ndarray:
-    """Píxeles de líneas blancas pintadas sobre el tartán rojo."""
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+def line_mask(
+    frame: np.ndarray,
+    ignore: Sequence[tuple[int, int, int, int]] = (),
+    hsv: np.ndarray | None = None,
+) -> np.ndarray:
+    """Píxeles de líneas blancas pintadas sobre el tartán rojo. `hsv`: el frame ya convertido."""
+    if hsv is None:
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     h, s, v = cv2.split(hsv)
     red = (((h < 14) | (h > 165)) & (s > 70) & (v > 60)).astype(np.uint8)
     white = ((s < 70) & (v > 165)).astype(np.uint8)
@@ -194,8 +199,10 @@ def line_curvature(frame: np.ndarray, min_px: int = 120) -> dict:
     for i in range(1, n):
         if stats[i, cv2.CC_STAT_AREA] < min_px:
             continue
-        ys, xs = np.nonzero(lab == i)
-        pts = np.stack([xs, ys], 1).astype(np.float64)
+        x0, y0 = stats[i, cv2.CC_STAT_LEFT], stats[i, cv2.CC_STAT_TOP]
+        w_i, h_i = stats[i, cv2.CC_STAT_WIDTH], stats[i, cv2.CC_STAT_HEIGHT]
+        ys, xs = np.nonzero(lab[y0 : y0 + h_i, x0 : x0 + w_i] == i)
+        pts = np.stack([xs + x0, ys + y0], 1).astype(np.float64)
         c = pts.mean(0)
         _, sv, vt = np.linalg.svd(pts - c, full_matrices=False)
         u, v = (pts - c) @ vt[0], (pts - c) @ vt[1]
