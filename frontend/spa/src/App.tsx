@@ -3,13 +3,14 @@ import { TrackMark } from './components/trazada/ui'
 import Home from './pages/Home'
 import NotFound from './pages/NotFound'
 import { NAV_ACTIONS_ID } from './navActions'
+import { ThemeToggle } from './components/ThemeToggle'
 
 function App() {
   return (
     <div className="flex min-h-svh flex-col bg-bg text-fg">
       <a
         href="#contenido"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-30 focus:rounded-ui focus:bg-fg focus:px-4 focus:py-2 focus:text-sm focus:text-white"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-30 focus:rounded-ui focus:bg-fg focus:px-4 focus:py-2 focus:text-sm focus:text-bg"
       >
         Saltar al contenido
       </a>
@@ -22,6 +23,7 @@ function App() {
           <p className="hidden text-sm text-muted md:block">Metros extra en cada curva</p>
           {/* Cada página pone aquí su acción principal (con createPortal) */}
           <div id={NAV_ACTIONS_ID} className="ml-auto flex items-center gap-3" />
+          <ThemeToggle />
         </nav>
       </header>
 
