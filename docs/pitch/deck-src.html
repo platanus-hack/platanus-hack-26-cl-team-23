@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trazada · Pitch</title>
+<style>
+/* Sistema "Pista" (DESIGN.md). Lienzo 1920×1080, margen 120, 12 columnas, separación 32.
+   Fuente editable: deck-src.html. Para presentar: deck.html (fuentes incrustadas), se genera con build.py. */
+@font-face { font-family: "Inter"; src: url(fonts/inter.woff2) format("woff2"); font-weight: 400 700; }
+@font-face { font-family: "Geist Mono"; src: url(fonts/geistmono-500.woff2) format("woff2"); font-weight: 500; }
+
+:root {
+  --bg: #F5F5F7;
+  --surface: #FFFFFF;
+  --zone: #F5F5F7;
+  --line: #E5E5EA;
+  --ink: #1D1D1F;
+  --ink2: #6E6E73;
+  --orange: #FF5B14;
+  --orange-text: #C2410C;
+  --cost: #FFD8C4;
+  --others: #8E8E93;
+  --won: #1A7F37;
+  --lost: #D70015;
+  --display: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+  --text: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+  --mono: "Geist Mono", ui-monospace, Menlo, monospace;
+  --sky: radial-gradient(120% 90% at 50% 115%, #FF5B14 0%, #FFA36B 32%, #F6C9A8 50%, #B9B8E6 74%, #8E9BE0 100%);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+/* La página (lo que sobra fuera de la lámina si la pantalla no es 16:9) va oscura, como en Keynote, para que el borde de la lámina se vea. */
+html, body { height: 100%; background: #000; overflow: hidden; }
+.stage { overflow: hidden; }
+body { color: var(--ink); font-family: var(--text); -webkit-font-smoothing: antialiased; }
+
+.stage { position: fixed; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 0 0; }
+.slide {
+  position: absolute; inset: 0; padding: 120px; background: var(--bg);
+  display: grid; grid-template-columns: repeat(12, 1fr); column-gap: 32px; align-content: start;
+  opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+.slide.on { opacity: 1; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { .slide { transition: none; } }
+
+/* ---- escala del deck (DESIGN.md §2, columna Deck) ---- */
+.fig   { font-family: var(--display); font-weight: 700; letter-spacing: -0.04em; line-height: .9; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fig-xl { font-size: 280px; }
+.fig-l  { font-size: 240px; }
+.fig .u { font-size: 96px; letter-spacing: -0.035em; margin-left: 16px; }
+.title { font-family: var(--display); font-size: 96px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.04; }
+.title-xl { font-size: 120px; }
+.sec   { font-family: var(--display); font-size: 48px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.12; }
+.sec-s { font-size: 40px; }
+.txt   { font-size: 32px; font-weight: 400; line-height: 1.38; }
+.txt-s { font-size: 28px; }
+.soft  { color: var(--ink2); }
+.label { font-family: var(--mono); font-size: 20px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); line-height: 1.5; }
+.src   { position: absolute; left: 120px; right: 120px; bottom: 96px; font-family: var(--mono); font-size: 18px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); line-height: 1.6; }
+.mt48 { margin-top: 48px; }
+.measure { max-width: 30ch; }
+
+.card { background: var(--surface); border-radius: 22px; padding: 48px; }
+.block { background: var(--zone); border-radius: 14px; padding: 32px 40px; }
+
+/* logo (DESIGN.md §4) */
+.brand { display: inline-flex; align-items: center; gap: 16px; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
+.brand svg { display: block; flex: none; }
+
+/* cielo con grano: solo portada y cierre */
+.sky { background: var(--sky); }
+.sky::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .35; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.2 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.sky > * { position: relative; z-index: 1; }
+
+/* ---- modo oscuro (tecla D): para proyectores que queman el blanco ----
+   Mismas reglas de DESIGN.md: naranja solo para el protagonista, todo lo demás en grises.
+   Fondo negro (el proyector no emite luz) y tinta clara sin llegar a blanco puro. */
+body.dark {
+  --bg: #000000;
+  --surface: #1C1C1E;
+  --zone: #2C2C2E;
+  --line: #38383A;
+  --ink: #F2F2F4;
+  --ink2: #A1A1A6;
+  --orange-text: #FF8A50;
+  --cost: #4A2414;
+  --others: #8E8E93;
+  --won: #30D158;
+  --lost: #FF453A;
+  --sky: radial-gradient(120% 90% at 50% 115%, #FF5B14 0%, #B8461E 20%, #4A2638 44%, #1B1A33 70%, #08080F 100%);
+}
+body.dark .sky::after { opacity: .25; }
+/* colores fijos dentro de los SVG (logo, curva, ilustraciones) */
+body.dark [stroke="#1D1D1F"] { stroke: var(--ink); }
+body.dark [fill="#1D1D1F"] { fill: var(--ink); }
+body.dark [stroke="#E5E5EA"] { stroke: var(--zone); }
+body.dark [fill="#F5F5F7"] { fill: var(--zone); }
+body.dark [fill="#FFD8C4"] { fill: var(--cost); }
+body.dark [fill="#6E6E73"] { fill: var(--ink2); }
+body.dark [fill="#C2410C"] { fill: var(--orange-text); }
+
+/* ---- láminas ---- */
+.cover, .close { align-content: space-between; }
+.cover .brand { grid-column: 1 / -1; font-size: 40px; }
+.cover .title { grid-column: 1 / -1; text-align: center; font-size: 120px; }
+.cover .label, .close .label { grid-column: 1 / -1; color: var(--ink); }
+
+.me .left { grid-column: 1 / 7; align-self: center; }
+.me { align-content: center; }
+.me .photo { grid-column: 7 / -1; height: 840px; border-radius: 22px; background: var(--surface); overflow: hidden; display: grid; place-items: center; }
+.me .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sol .brand { grid-column: 1 / -1; font-size: 40px; }
+.sol .title { grid-column: 1 / 11; margin-top: 64px; }
+.sol .card { grid-column: span 4; margin-top: 80px; display: flex; flex-direction: column; gap: 24px; min-height: 340px; }
+.imp .title { margin-top: 48px; }
+.demo-go { align-content: space-between; }
+.demo-go .title { grid-column: 1 / -1; }
+.demo-go > .label { grid-column: 1 / -1; }
+.close .qrbox { position: absolute; right: 120px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.qr { width: 360px; height: 360px; background: #FFFFFF; padding: 28px; border-radius: 22px; box-sizing: content-box; }
+.qrbox .label { color: var(--ink); text-align: center; }
+.demo-go .title { padding-top: 240px; }
+.demo-go .label { color: var(--ink); }
+.close .soft-ink { color: var(--ink); max-width: 32ch; }
+.hook .left { grid-column: 1 / 8; padding-top: 96px; }
+.hook .art  { grid-column: 8 / -1; padding-top: 64px; }
+
+.prob .main { grid-column: 1 / 10; padding-top: 96px; }
+.prob .second { grid-column: 1 / 9; margin-top: 96px; padding-top: 32px; border-top: 2px solid var(--line); }
+
+.today .title, .how .title, .whatif .title { grid-column: 1 / 11; padding-top: 48px; }
+.today .card, .how .card, .whatif .card { grid-column: span 4; margin-top: 96px; display: flex; flex-direction: column; gap: 24px; min-height: 360px; }
+
+.promise .brand { grid-column: 1 / -1; font-size: 40px; }
+.promise .title { grid-column: 1 / 11; margin-top: 120px; }
+.promise .txt { grid-column: 1 / 8; margin-top: 48px; }
+
+.demo .card, .backup .card { grid-column: 1 / -1; height: 840px; padding: 32px; display: flex; flex-direction: column; gap: 24px; }
+.demo .shot { flex: 1; min-height: 0; border-radius: 14px; background: var(--zone); overflow: hidden; display: grid; place-items: center; }
+.demo .shot img { width: 100%; height: 100%; object-fit: cover; object-position: top left; display: block; }
+.demo .label, .backup .label { color: var(--ink); }
+.backup video { flex: 1; min-height: 0; width: 100%; border-radius: 14px; background: var(--zone); }
+.backup .missing { flex: 1; border-radius: 14px; background: var(--zone); display: grid; place-items: center; }
+
+.hero { align-content: center; }
+.hero .card { grid-column: 1 / -1; padding: 64px; display: grid; grid-template-columns: repeat(12, 1fr); column-gap: 32px; row-gap: 48px; }
+.hero .fig, .hero .what { grid-column: 1 / -1; }
+.hero .what { margin-top: -16px; }
+.hero .block { grid-column: span 6; }
+.hero .won { color: var(--won); }
+
+.how .n { font-family: var(--display); font-size: 120px; font-weight: 700; letter-spacing: -0.04em; line-height: .9; color: var(--others); }
+
+.close .brand { grid-column: 1 / -1; font-size: 96px; gap: 32px; }
+.close .title { grid-column: 1 / 11; }
+.close > div:nth-of-type(2) { grid-column: 1 / 8; }
+
+/* ---- apéndice ---- */
+.apx-cover .title { grid-column: 1 / 11; padding-top: 96px; }
+.apx-cover .txt { grid-column: 1 / 9; margin-top: 32px; }
+.apx-cover .idx { grid-column: 1 / -1; margin-top: 96px; display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 32px; row-gap: 24px; color: var(--ink2); }
+.apx-shot .sec { grid-column: 1 / 11; }
+.apx-shot .card { grid-column: 1 / -1; margin-top: 40px; padding: 24px; }
+.apx-shot img { display: block; width: 100%; border-radius: 14px; }
+.apx-zone .left, .apx-fore .left { grid-column: 1 / 7; padding-top: 96px; }
+.apx-zone .right, .apx-fore .right { grid-column: 7 / -1; padding-top: 120px; }
+.bars { margin-top: 24px; display: flex; flex-direction: column; gap: 28px; }
+.bar { display: grid; grid-template-columns: 1fr auto; row-gap: 10px; align-items: baseline; }
+.bar i { grid-column: 1 / -1; grid-row: 2; height: 14px; border-radius: 7px; background: linear-gradient(90deg, var(--others) var(--w), var(--line) var(--w)); }
+.bar b { font-family: var(--display); font-size: 32px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.bar.hero-bar i { background: linear-gradient(90deg, var(--orange) var(--w), var(--line) var(--w)); }
+.apx-fore .stack { display: flex; flex-direction: column; gap: 24px; }
+.apx-rules .title, .apx-who .title, .apx-hidden .title, .apx-pass .title, .apx-gaps .title { grid-column: 1 / 11; padding-top: 48px; }
+.apx-rules .card { grid-column: span 6; margin-top: 80px; display: flex; flex-direction: column; gap: 24px; }
+.apx-rules .wide { grid-column: 1 / -1; margin-top: 32px; }
+.apx-pass .card { grid-column: span 4; margin-top: 96px; display: flex; flex-direction: column; gap: 24px; min-height: 340px; }
+.apx-who .rows { grid-column: 1 / -1; margin-top: 64px; }
+.apx-who .r { display: grid; grid-template-columns: 7fr 5fr; column-gap: 32px; align-items: baseline; padding: 22px 0; border-top: 1px solid var(--line); }
+.apx-hidden .chart { grid-column: 1 / -1; margin-top: 64px; padding: 40px; }
+.gaps { grid-column: 1 / -1; margin-top: 64px; border-collapse: collapse; width: 100%; font-size: 30px; }
+.gaps th { text-align: left; font-family: var(--mono); font-weight: 500; font-size: 18px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); padding: 0 32px 16px 0; }
+.gaps td { padding: 22px 32px 22px 0; border-top: 1px solid var(--line); line-height: 1.3; }
+.gaps td:first-child { font-family: var(--display); font-weight: 600; width: 26%; }
+.gaps td:last-child { color: var(--ink2); }
+
+/* ---- capas de ensayo: notas (N) y cronómetro (T) ---- */
+.notes { position: fixed; left: 0; right: 0; bottom: 0; max-height: 46vh; overflow: auto; background: #1D1D1F; border-top: 1px solid #38383A; color: #fff; font-family: var(--text); font-size: 20px; line-height: 1.45; padding: 20px 28px 24px; display: none; z-index: 10; }
+.notes.on { display: block; }
+.notes b { font-family: var(--mono); font-weight: 500; font-size: 14px; letter-spacing: .08em; color: #FFA36B; display: block; margin-bottom: 6px; }
+.clock { position: fixed; right: 20px; top: 16px; font-family: var(--mono); font-size: 20px; background: #1D1D1F; color: #fff; padding: 6px 12px; border-radius: 8px; display: none; z-index: 11; font-variant-numeric: tabular-nums; }
+.clock.on { display: block; }
+.clock.late { background: var(--lost); }
+.help { position: fixed; left: 20px; top: 16px; font-family: var(--mono); font-size: 13px; color: #A1A1A6; z-index: 9; transition: opacity .6s; }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+
+  <!-- 1 · PORTADA (receta 1) -->
+  <section class="slide cover sky" data-t="antes" data-note="Lámina de espera mientras suben. Andrés parte con el gancho al pasar a la siguiente.">
+    <div class="brand"><svg viewBox="0 0 40 40" width="56" height="56" fill="none" stroke="#1D1D1F" stroke-linecap="round" stroke-width="3.6" aria-hidden="true"><path d="M4 6 H36"/><path d="M4 13 H8 A6 6 0 0 1 14 19 V36"/><path d="M36 13 H32 A6 6 0 0 0 26 19 V36"/><path d="M20 13 V36"/></svg>Trazada</div>
+    <h1 class="title">Mira la carrera que el cronómetro no ve.</h1>
+    <div class="label">Platanus Hack Santiago 26 · Physical World</div>
+  </section>
+
+  <!-- 2 · ANDRÉS -->
+  <section class="slide me" data-t="0:00" data-note="Hola, soy Andrés y corro desde los 13 años, [800 y 1500]. [En el Nacional de 20XX quedé a X décimas del podio.] ¿Dónde se me fueron? Nadie me lo pudo decir.">
+    <div class="left">
+      <h2 class="title title-xl">Corro desde los 13 años.</h2>
+    </div>
+    <div class="photo" id="photo"><img src="andres.jpg" alt="Andrés corriendo en la pista"></div>
+  </section>
+
+  <!-- 3 · RÍO (receta 2) -->
+  <section class="slide hook" data-t="0:15" data-note="En un Mundial, cada corredor lleva un chip y lo siguen doce cámaras. Y esos metros deciden carreras: en la final de 800 de Río, el plata corrió casi cuatro metros más que el oro. Yo salgo de la pista con un cronómetro y un video en el celular.">
+    <div class="left">
+      <div class="fig fig-xl">805,3<span class="u">m</span></div>
+      <p class="txt mt48 measure">corrió el medallista de plata en la final de 800 m de Río 2016. El oro, 801,4 m. La diferencia está en las curvas.</p>
+    </div>
+    <div class="art">
+      <svg viewBox="0 0 640 640" width="100%" aria-label="Curva de pista vista desde arriba: el oro por la cuerda, el plata por fuera">
+        <path d="M120 100 H300 A220 220 0 0 1 300 540 H120" fill="none" stroke="#E5E5EA" stroke-width="80"/>
+        <path d="M120 128 H300 A192 192 0 0 1 300 512 H120" fill="none" stroke="#1D1D1F" stroke-width="3" stroke-dasharray="2 12" stroke-linecap="round"/>
+        <path d="M120 72 H300 A248 248 0 0 1 300 568 H120" fill="none" stroke="#FF5B14" stroke-width="6" stroke-linecap="round"/>
+        <text x="120" y="44" font-family="Geist Mono, monospace" font-size="20" font-weight="500" letter-spacing="1.6" fill="#C2410C">PLATA · 805,3 M</text>
+        <text x="120" y="184" font-family="Geist Mono, monospace" font-size="20" font-weight="500" letter-spacing="1.6" fill="#6E6E73">ORO · 801,4 M · CUERDA</text>
+      </svg>
+    </div>
+    <div class="src">González-Mohíno et al., 2021 · Kinesiology 53(2)</div>
+  </section>
+
+  <!-- 4 · SOLUCIÓN (receta 4) -->
+  <section class="slide sol" data-t="0:30" data-note="Por eso hicimos TRAZADA. Con video, sin chips ni docenas de cámaras, mide a cada corredor en metros: por dónde corrió, cuánto le costó cada curva y dónde le convenía adelantar. Y como todas las pistas siguen el mismo reglamento, se mide igual en Chile que en un Mundial. ">
+    <div class="brand"><svg viewBox="0 0 40 40" width="56" height="56" fill="none" stroke="#1D1D1F" stroke-linecap="round" stroke-width="3.6" aria-hidden="true"><path d="M4 6 H36"/><path d="M4 13 H8 A6 6 0 0 1 14 19 V36"/><path d="M36 13 H32 A6 6 0 0 0 26 19 V36"/><path d="M20 13 V36"/></svg>Trazada</div>
+    <h2 class="title">La cancha es la regla.</h2>
+    <div class="card"><p class="sec">Medido</p><p class="txt txt-s soft">Cada corredor en metros: por dónde corrió, cuánto le costó cada curva, dónde le convenía adelantar.</p></div>
+    <div class="card"><p class="sec">Comparable</p><p class="txt txt-s soft">Todas las pistas siguen el mismo reglamento: se mide igual en Chile que en un Mundial.</p></div>
+    <div class="card"><p class="sec">Accesible</p><p class="txt txt-s soft">Con video. Sin chips ni docenas de cámaras.</p></div>
+    <div class="src">Pista oficial: radio 36,5 m · carril 1,22 m · World Athletics</div>
+  </section>
+
+  <!-- 5 · DEMO (puente a la app) -->
+  <section class="slide demo-go" data-t="0:45" data-note="Se lo mostramos. → Nico cambia a la app (Cmd+Tab) y no vuelve a las láminas hasta el Gracias. Si la app no carga en 10 s: tecla V (grabación).">
+    <h2 class="title title-xl">Se lo mostramos.</h2>
+    <p class="label">Demo · final de 1500 m varones · NCAA 2025</p>
+  </section>
+
+  <!-- 6 · IMPACTO Y FUTURO (después de la demo) -->
+  <section class="slide sol imp" data-t="2:30" data-note="(Nico vuelve a las láminas.) Hoy, un atleta y su entrenador ya pueden ver dónde se ganó y dónde se perdió una carrera grabada. Lo siguiente es un celular en la tribuna, en vivo, y datos que se comparan entre clubes, porque todas las pistas miden lo mismo. Y el sueño: cualquier deporte con cancha oficial, el velódromo, el patinaje, y verlo en AR desde donde estés. La cancha es la regla.">
+    <h2 class="title">De una pista en Chile a cualquier cancha del mundo.</h2>
+    <div class="card"><p class="sec">Hoy</p><p class="txt txt-s soft">El atleta y su entrenador ven dónde se ganó y dónde se perdió una carrera grabada.</p></div>
+    <div class="card"><p class="sec">Lo siguiente</p><p class="txt txt-s soft">Un celular en la tribuna, en vivo. Datos comparables entre clubes.</p></div>
+    <div class="card"><p class="sec">El sueño</p><p class="txt txt-s soft">Cualquier deporte con cancha oficial, y verlo en AR desde donde estés.</p></div>
+  </section>
+
+  <!-- 7 · GRACIAS (receta 6) -->
+  <section class="slide close sky" data-t="2:45" data-note="Todo lo que pasa en la cancha, en datos para todos. Somos TRAZADA. Gracias.">
+    <div class="brand"><svg viewBox="0 0 40 40" width="120" height="120" fill="none" stroke="#1D1D1F" stroke-linecap="round" stroke-width="3.6" aria-hidden="true"><path d="M4 6 H36"/><path d="M4 13 H8 A6 6 0 0 1 14 19 V36"/><path d="M36 13 H32 A6 6 0 0 0 26 19 V36"/><path d="M20 13 V36"/></svg>Trazada</div>
+    <div>
+      <h2 class="title title-xl">Gracias.</h2>
+      <p class="sec soft-ink mt48">Todo lo que pasa en la cancha, en datos para todos.</p>
+    </div>
+    <div class="qrbox"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29" class="qr" role="img" aria-label="Código QR a platanus-hack-26-nid.vercel.app" shape-rendering="crispEdges"><path class="qrline" stroke="#000" d="M0 0.5h7m2 0h2m1 0h1m1 0h2m3 0h2m1 0h7m-29 1h1m5 0h1m1 0h1m1 0h2m1 0h1m1 0h1m3 0h2m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m4 0h2m2 0h1m2 0h1m3 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m7 0h1m7 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h3m4 0h2m2 0h2m1 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m2 0h1m1 0h1m1 0h1m1 0h1m2 0h3m1 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-20 1h1m1 0h1m1 0h1m1 0h3m-18 1h1m1 0h1m1 0h1m1 0h1m6 0h1m1 0h6m3 0h1m2 0h1m-21 1h3m1 0h1m1 0h2m1 0h1m3 0h3m2 0h1m2 0h1m-28 1h1m1 0h1m1 0h2m1 0h2m1 0h2m1 0h1m7 0h1m1 0h1m1 0h3m-29 1h2m1 0h2m4 0h2m1 0h2m1 0h4m8 0h1m-25 1h1m2 0h1m1 0h2m4 0h1m1 0h2m2 0h4m1 0h1m1 0h2m-29 1h4m1 0h1m1 0h1m1 0h1m2 0h2m2 0h1m3 0h3m2 0h1m2 0h1m-29 1h1m3 0h1m1 0h1m1 0h3m1 0h1m1 0h1m2 0h1m3 0h1m1 0h3m1 0h2m-28 1h1m1 0h3m1 0h1m1 0h2m2 0h1m3 0h1m1 0h1m1 0h3m1 0h1m1 0h1m-28 1h3m3 0h5m3 0h1m1 0h2m2 0h3m2 0h1m1 0h2m-28 1h2m2 0h1m10 0h1m3 0h1m1 0h1m2 0h2m1 0h1m-29 1h1m1 0h2m2 0h1m1 0h2m1 0h3m2 0h1m1 0h1m1 0h3m1 0h1m2 0h2m-28 1h1m3 0h1m5 0h2m4 0h3m4 0h2m1 0h1m-28 1h1m3 0h1m1 0h1m1 0h1m8 0h1m1 0h6m-17 1h1m3 0h2m2 0h2m1 0h2m3 0h1m1 0h3m-29 1h7m3 0h1m1 0h1m1 0h1m4 0h2m1 0h1m1 0h2m1 0h2m-29 1h1m5 0h1m2 0h1m2 0h6m2 0h1m3 0h2m2 0h1m-29 1h1m1 0h3m1 0h1m1 0h5m1 0h1m1 0h3m1 0h5m2 0h2m-29 1h1m1 0h3m1 0h1m3 0h1m1 0h1m1 0h1m1 0h1m6 0h2m1 0h3m-29 1h1m1 0h3m1 0h1m1 0h2m2 0h2m2 0h2m1 0h1m1 0h1m1 0h3m2 0h1m-29 1h1m5 0h1m2 0h1m6 0h2m1 0h3m1 0h1m3 0h1m-28 1h7m1 0h1m1 0h3m4 0h1m2 0h2m2 0h2m1 0h2"/></svg><p class="label">Pruébenlo</p></div>
+    <div class="label"><span style="text-transform:none; letter-spacing:0.02em">platanus-hack-26-nid.vercel.app</span> · Andrés · Daniel · Nico</div>
+  </section>
+
+  <!-- ================= APÉNDICE (después del cierre; tecla A salta aquí) ================= -->
+
+  <section class="slide apx-cover" data-apx="1" data-t="preguntas" data-note="Apéndice para preguntas del jurado. Responde Daniel. Navegar con flechas; tecla A vuelve a esta lámina.">
+    <h2 class="title">Apéndice técnico</h2>
+    <p class="txt soft">Para las preguntas del jurado. Prototipo sobre la final de 1500 m NCAA 2025, video de TV.</p>
+    <div class="idx">
+      <p class="sec sec-s">Así se ve por dentro</p><p class="sec sec-s">Dónde está el grupo</p><p class="sec sec-s">Dónde está cada atleta</p>
+      <p class="sec sec-s">Quién compite</p><p class="sec sec-s">Atletas ocultos</p><p class="sec sec-s">Pronóstico del final</p>
+      <p class="sec sec-s">Cuándo adelantar</p><p class="sec sec-s">Qué falta</p>
+    </div>
+  </section>
+
+  <!-- APX · TRES DESAFÍOS -->
+  <section class="slide how" data-apx="1" data-t="preguntas" data-note="Para lograrlo resolvimos tres desafíos. Uno: una pista no tiene puntos únicos; las líneas se repiten. Así que el sistema sigue el recorrido de la cámara y deduce qué tramo está viendo: en esta final acierta 86 de cada 100 veces. Dos: los corredores se tapan entre ellos; los seguimos y les devolvemos su identidad cuando reaparecen. Tres: tiene que funcionar en vivo, así que cada cálculo usa solo lo que ya pasó, nunca el futuro.">
+    <h2 class="title">Tres desafíos que resolvimos.</h2>
+    <div class="card"><span class="n">1</span><p class="sec sec-s">La pista se repite</p><p class="txt txt-s soft">Sin puntos únicos, seguimos el recorrido de la cámara para saber qué tramo ve. Acierta 86 de cada 100 veces.</p></div>
+    <div class="card"><span class="n">2</span><p class="sec sec-s">Los corredores se tapan</p><p class="txt txt-s soft">Los seguimos cuadro a cuadro y les devolvemos su identidad cuando reaparecen.</p></div>
+    <div class="card"><span class="n">3</span><p class="sec sec-s">Tiene que ser en vivo</p><p class="txt txt-s soft">Cada cálculo usa solo lo que ya pasó, nunca el futuro.</p></div>
+    <div class="src">Acierto: final NCAA 2025, contra etiquetas borrador del equipo</div>
+  </section>
+
+  <!-- APX · HOY, LO SIGUIENTE, EL SUEÑO -->
+  <section class="slide whatif" data-apx="1" data-t="preguntas" data-note="Hoy funciona sobre video grabado. Lo siguiente ya está prototipado: un celular en la tribuna, transmitiendo en vivo, y después la señal de televisión. ¿Y el sueño? Todo deporte reglamentado se juega sobre una geometría oficial: la cancha es la regla. El fútbol de élite ya lo usa. Nosotros lo resolvimos en una pista, donde todo se repite: el caso difícil. Lo siguiente es el velódromo, el patinaje y cualquier estadio del mundo.">
+    <h2 class="title">Hoy funciona en video grabado. Lo siguiente, en vivo.</h2>
+    <div class="card"><p class="sec">Hoy</p><p class="txt txt-s soft">Video grabado de una carrera: metros por corredor en una pista de 400 m.</p></div>
+    <div class="card"><p class="sec">Lo siguiente</p><p class="txt txt-s soft">Un celular en la tribuna, en vivo. Después, la señal de TV.</p></div>
+    <div class="card"><p class="sec">El sueño</p><p class="txt txt-s soft">Velódromo, patinaje y cualquier estadio del mundo.</p></div>
+    <div class="src">Fútbol con video: SkillCorner, Hudl, Veo · revisión del equipo, nov. 2026</div>
+  </section>
+
+  <section class="slide apx-shot" data-apx="1" data-t="preguntas" data-note="Salida del prototipo a los 2:50 de carrera. Cajas: atletas con puesto, metros, calle y velocidad. Arriba a la izquierda, vista cenital del grupo. Al centro, la zona que enfoca la cámara. A la derecha, pronóstico del tiempo ganador, probabilidad de ganar y podio, y las tres mejores oportunidades de adelantamiento. Todo en línea, sin mirar el futuro.">
+    <h2 class="sec">Así se ve por dentro: la salida del prototipo a los 2:50 de carrera.</h2>
+    <div class="card"><img src="apendice/sistema.jpg" alt="Video de la final con cajas por atleta, zona de la pista, pronóstico del final y sugerencias de adelantamiento"></div>
+    <div class="src">Prototipo de Daniel · final 1500 m NCAA 2025 · todo calculado en línea</div>
+  </section>
+
+  <section class="slide apx-zone" data-apx="1" data-t="preguntas" data-note="La cámara de TV gira, hace zoom y corta; en la recta las líneas no dicen cuánto avanzó. Por eso separamos dónde está el grupo (decenas de metros) de cómo se ordenan los atletas dentro (centímetros a metros). El grupo se ubica con un filtro de partículas: 4.000 hipótesis de posición y velocidad que se corrigen con el reglamento (hora y punto de largada), los cortes de cámara (detecta los 14 de la final sin falsos positivos), la memoria de encuadres que la TV repite cada vuelta, la curvatura de las líneas y la velocidad medida contra marcas del suelo. Error mediano ~10 m y cuando se equivoca es siempre la zona vecina. Ojo: umbrales elegidos con el mismo video.">
+    <div class="left">
+      <div class="fig fig-l">86,5<span class="u">%</span></div>
+      <p class="txt mt48 measure">de acierto al decir qué zona de la pista enfoca la cámara de TV. Cuando falla, es la zona vecina: ~10 m de error mediano.</p>
+    </div>
+    <div class="right">
+      <p class="label">Qué evidencia se suma</p>
+      <div class="bars">
+        <div class="bar"><span class="txt txt-s">Solo el reglamento</span><i style="--w:55%"></i><b>55 %</b></div>
+        <div class="bar"><span class="txt txt-s">+ curvatura de las líneas</span><i style="--w:69%"></i><b>69 %</b></div>
+        <div class="bar"><span class="txt txt-s">+ memoria de encuadres</span><i style="--w:82%"></i><b>82 %</b></div>
+        <div class="bar hero-bar"><span class="txt txt-s">Las dos juntas</span><i style="--w:86.5%"></i><b>86,5 %</b></div>
+      </div>
+    </div>
+    <div class="src">455 muestras · una sola carrera; umbrales elegidos con el mismo video</div>
+  </section>
+
+  <section class="slide apx-rules" data-apx="1" data-t="preguntas" data-note="Lo relativo se mide dentro de un mismo cuadro, así que paneos, zoom y cortes no afectan: todos comparten cámara en ese instante. Regla longitudinal: el alto de la caja de un corredor es estable, ~1,75 m (el ancho varía 3 veces con la zancada). Regla lateral: los cruces con las líneas dan el ancho de calle en píxeles; distancia al bordillo = calles × 1,22 m, sin calibrar. Un filtro de Kalman por atleta junta grupo + relativo. Validado en video sintético: 0,5 m de error longitudinal y 0,33 m lateral. Falta validar con video real etiquetado.">
+    <h2 class="title">Dónde va cada atleta, sin calibrar la cámara.</h2>
+    <div class="card"><p class="sec">El cuerpo mide ~1,75 m</p><p class="txt txt-s soft">El alto de la caja es estable y da los píxeles por metro según la fila del pie: cuánto va adelante o atrás.</p></div>
+    <div class="card"><p class="sec">La calle mide 1,22 m</p><p class="txt txt-s soft">Contando líneas desde el pie hasta el bordillo sale la distancia a la cuerda, y de ahí los metros extra en curva.</p></div>
+    <div class="block wide"><p class="sec sec-s">Error en video sintético: 0,5 m adelante–atrás · 0,33 m lateral</p></div>
+    <div class="src">Video sintético, 259 pares · falta validar con video real</div>
+  </section>
+
+  <section class="slide apx-who" data-apx="1" data-t="preguntas" data-note="El detector encuentra a todas las personas: público, jueces, camarógrafos y gente dentro de los gráficos de TV. Filtros en orden: fuera de los gráficos de TV; pies sobre tartán (más de 30 % de píxeles color tartán junto al pie); tamaño parecido al grupo (0,35 a 2,2 veces la mediana); nunca más atletas que corredores en la serie (12); y se suelta un ID si implica un salto físicamente imposible. Limitación: un juez parado sobre el tartán, de tamaño similar, pasaría; siguiente paso, re-identificar por camiseta o dorsal.">
+    <h2 class="title">Quién compite y quién no.</h2>
+    <div class="rows">
+      <div class="r"><p class="sec sec-s">Fuera de los gráficos de TV</p><p class="txt txt-s soft">Nadie corre dentro del marcador o del logo.</p></div>
+      <div class="r"><p class="sec sec-s">Pies sobre el tartán</p><p class="txt txt-s soft">Descarta público, jueces en el pasto y camarógrafos.</p></div>
+      <div class="r"><p class="sec sec-s">Tamaño parecido al grupo</p><p class="txt txt-s soft">Descarta personas lejanas o pegadas a la cámara.</p></div>
+      <div class="r"><p class="sec sec-s">Nunca más atletas que en la serie</p><p class="txt txt-s soft">Tras un corte, un "nuevo" es alguien ya conocido.</p></div>
+      <div class="r"><p class="sec sec-s">Física plausible</p><p class="txt txt-s soft">Un salto imposible suelta el ID en vez de inventar.</p></div>
+    </div>
+    <div class="src">Limitación: un juez sobre el tartán pasaría · siguiente: dorsal</div>
+  </section>
+
+  <section class="slide apx-hidden" data-apx="1" data-t="preguntas" data-note="En un pelotón es normal que un corredor quede tapado. La ausencia de detección es falta de dato, no evidencia de que se fue: sigue avanzando con la velocidad del grupo y su incertidumbre crece; sigue en la clasificación (con histéresis de 0,4 m) y en el pronóstico 15 s; el recuerdo de identidad dura 40 s. Al reaparecer se re-identifica por posición predicha, distancia lateral y color de camiseta. El gráfico es una ilustración con los mismos parámetros del sistema.">
+    <h2 class="title">Un atleta que no se ve no desapareció.</h2>
+    <div class="card chart">
+      <svg viewBox="0 0 1600 420" width="100%" aria-label="Posición estimada de un atleta: la banda de incertidumbre se abre mientras está oculto y se cierra al reaparecer">
+        <rect x="640" y="20" width="420" height="340" fill="#F5F5F7"/>
+        <text x="660" y="56" font-family="Geist Mono, monospace" font-size="20" font-weight="500" letter-spacing="1.6" fill="#6E6E73">OCULTO 4,5 S</text>
+        <path d="M40 300 L640 230 C760 216 900 196 1060 178 L1560 120 L1560 128 L1060 186 C900 250 760 250 640 238 L40 308 Z" fill="#FFD8C4"/>
+        <path d="M640 230 C760 160 900 130 1060 170 L1060 186 C900 260 760 290 640 238 Z" fill="#FFD8C4"/>
+        <path d="M40 304 L640 234 C760 220 900 200 1060 182 L1560 124" fill="none" stroke="#FF5B14" stroke-width="5" stroke-linecap="round"/>
+        <g fill="#1D1D1F"><circle cx="160" cy="291" r="6"/><circle cx="300" cy="275" r="6"/><circle cx="440" cy="258" r="6"/><circle cx="580" cy="241" r="6"/><circle cx="1120" cy="175" r="6"/><circle cx="1260" cy="158" r="6"/><circle cx="1400" cy="142" r="6"/></g>
+        <text x="40" y="400" font-family="Geist Mono, monospace" font-size="20" font-weight="500" letter-spacing="1.6" fill="#6E6E73">TIEMPO →</text>
+        <text x="1180" y="240" font-family="Geist Mono, monospace" font-size="20" font-weight="500" letter-spacing="1.6" fill="#6E6E73">● MEDICIONES · BANDA: INCERTIDUMBRE</text>
+      </svg>
+    </div>
+    <div class="src">Ilustración con los parámetros reales · identidad recordada 40 s</div>
+  </section>
+
+  <section class="slide apx-fore" data-apx="1" data-t="preguntas" data-note="Con posición, velocidad e incertidumbre de cada atleta se pronostica en vivo la llegada, la probabilidad de ganar y de podio y el tiempo ganador. El resto de carrera: crucero que vuelve al ritmo típico de la prueba (escala 350 m) y un sprint final de ~300 m a 1,10 veces ese ritmo. 3.000 simulaciones con factores comunes, para no confundir 'todos más lentos' con 'uno más lento'. Error del tiempo ganador: 3,5 a 6,9 s en la primera mitad, 1,0 s en los últimos 200 m. Los priors no se ajustaron con esta carrera; queda ~3 s lento y los intervalos son angostos (cubren ~40 % en vez de 80 %).">
+    <div class="left">
+      <div class="fig fig-l">1,0<span class="u">s</span></div>
+      <p class="txt mt48 measure">de error al pronosticar el tiempo ganador en los últimos 200 m de la final, en vivo.</p>
+    </div>
+    <div class="right stack">
+      <div class="block"><p class="sec sec-s">3,5–6,9 s de error en la primera mitad</p></div>
+      <div class="block"><p class="sec sec-s">3.000 simulaciones por cuadro: crucero + sprint final</p></div>
+      <div class="block"><p class="sec sec-s">Intervalos todavía angostos: cubren ~40 % en vez de 80 %</p></div>
+    </div>
+    <div class="src">Verdad: 3:47,27 · priors no ajustados con esta carrera · una sola carrera</div>
+  </section>
+
+  <section class="slide apx-pass" data-apx="1" data-t="preguntas" data-note="Para cada atleta con un rival a 15 m o menos, se calcula la probabilidad de llegar antes según dónde inicie el ataque. Cuatro ideas: energía (velocidad crítica y reserva D′, el modelo estándar de medio fondo), rebufo (ir detrás cuesta como correr ~3 % más lento), curva (pasar 1 m por fuera suma ~0,7 m en 25 m de maniobra) y capacidades que se aprenden en carrera con 1.000 partículas por atleta. Resultado en tests: el fondista debe atacar ya, el velocista esperar a la recta (ideal 275 m, sin costo de curva) y entre iguales mantener a rebufo. Falta validar contra adelantamientos reales.">
+    <h2 class="title">Cuándo conviene adelantar.</h2>
+    <div class="card"><p class="sec">Atacar ya</p><p class="txt txt-s soft">El fondista, con más reserva y menos sprint, solo gana si ataca ahora.</p></div>
+    <div class="card"><p class="sec">Esperar</p><p class="txt txt-s soft">El velocista gana si espera a la recta: ideal a 275 m, sin costo de curva.</p></div>
+    <div class="card"><p class="sec">Mantener</p><p class="txt txt-s soft">Entre iguales no hay ventana: mejor seguir a rebufo.</p></div>
+    <div class="src">Velocidad crítica y reserva D′ · validado en tests, no en carreras</div>
+  </section>
+
+  <section class="slide apx-gaps" data-apx="1" data-t="preguntas" data-note="Lectura honesta: los resultados sobre la NCAA usan una sola carrera y varias cifras se ajustaron mirando ese video; es prueba de concepto. Los centímetros vienen de video sintético. Los priors de energía vienen de la literatura. El cuello de botella es la velocidad absoluta del grupo: la posición sale bien, pero el pronóstico y el asesor dependen de esa velocidad.">
+    <h2 class="title">Lo que funciona y lo que falta.</h2>
+    <table class="gaps">
+      <thead><tr><th>Pieza</th><th>Funciona</th><th>Falta</th></tr></thead>
+      <tbody>
+        <tr><td>Zona de la pista</td><td>86,5 % de acierto, causal</td><td>Probar con otra carrera</td></tr>
+        <tr><td>Cada atleta</td><td>0,5 m y 0,33 m en sintético</td><td>Validar con video real etiquetado</td></tr>
+        <tr><td>Quién compite</td><td>Descarta público, jueces y gráficos</td><td>Re-identificar por dorsal</td></tr>
+        <tr><td>Pronóstico</td><td>1,0 s en los últimos 200 m</td><td>Calibrar con varias finales</td></tr>
+        <tr><td>Adelantamiento</td><td>Correcto en los tests</td><td>Validar con carreras reales</td></tr>
+      </tbody>
+    </table>
+    <div class="src">Cuello de botella: la velocidad absoluta del grupo</div>
+  </section>
+
+  <!-- RESPALDO (oculta: tecla V) -->
+  <section class="slide backup" data-hidden="1" data-t="0:55" data-note="Plan B. 'Les muestro la grabación de hace unas horas.' Narrar igual que la demo en vivo.">
+    <div class="card">
+      <div class="label">Grabación de pantalla · final de 1500 m NCAA 2025</div>
+      <video id="backup" src="demo-respaldo.mp4" controls playsinline preload="auto"></video>
+    </div>
+  </section>
+
+</div>
+
+<div class="clock" id="clock">0:00</div>
+<div class="notes" id="notes"></div>
+<div class="help" id="help">← → avanzar · F pantalla completa · N notas · T cronómetro · V demo de respaldo · A apéndice · D modo oscuro</div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const all = [...document.querySelectorAll('.slide')];
+  const main = all.filter(s => !s.dataset.hidden);
+  const firstApx = main.findIndex(s => s.dataset.apx);
+  const backup = all.find(s => s.dataset.hidden);
+  const notes = document.getElementById('notes');
+  const clock = document.getElementById('clock');
+  let i = 0, showingBackup = false, t0 = null, timer = null;
+
+  const fit = () => { const k = Math.min(innerWidth / 1920, innerHeight / 1080); stage.style.transform = `scale(${k}) translate(-50%, -50%)`; };
+  const current = () => showingBackup ? backup : main[i];
+  function render() {
+    all.forEach(s => s.classList.toggle('on', s === current()));
+    const s = current();
+    notes.innerHTML = `<b>${showingBackup ? 'RESPALDO' : (s.dataset.apx ? 'APÉNDICE ' + (i - firstApx + 1) : (i + 1) + ' / ' + firstApx)} · OBJETIVO ${s.dataset.t.toUpperCase()}</b>${s.dataset.note || ''}`;
+    if (!showingBackup) { const v = document.getElementById('backup'); if (v && v.pause) v.pause(); }
+    try { history.replaceState(null, '', '#' + (showingBackup ? 'v' : i + 1)); } catch (e) {}
+  }
+  function go(d) { showingBackup = false; i = Math.max(0, Math.min(main.length - 1, i + d)); render(); }
+  const toSec = s => { const p = s.split(':').map(Number); return p.length === 2 ? p[0] * 60 + p[1] : 0; };
+  function tick() {
+    const e = Math.floor((Date.now() - t0) / 1000);
+    clock.textContent = `${Math.floor(e / 60)}:${String(e % 60).padStart(2, '0')}`;
+    const next = main[i + 1];
+    clock.classList.toggle('late', (!!next && /:/.test(next.dataset.t) && e > toSec(next.dataset.t)) || e > 180);
+  }
+
+  addEventListener('keydown', e => {
+    const k = e.key;
+    if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(k)) { e.preventDefault(); go(1); }
+    else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(k)) { e.preventDefault(); go(-1); }
+    else if (k === 'Home') { i = 0; go(0); }
+    else if (k === 'End') { i = main.length - 1; go(0); }
+    else if (/^[0-9]$/.test(k)) { const n = k === '0' ? 10 : +k; if (n <= firstApx) { i = n - 1; go(0); } }
+    else if (k === 'a' || k === 'A') { i = firstApx; go(0); }
+    else if (k === 'd' || k === 'D') { const on = document.body.classList.toggle('dark'); try { localStorage.setItem('trazada-tema', on ? 'oscuro' : 'claro'); } catch (e) {} }
+    else if (k === 'f' || k === 'F') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }
+    else if (k === 'n' || k === 'N') notes.classList.toggle('on');
+    else if (k === 't' || k === 'T') {
+      if (timer) { clearInterval(timer); timer = null; clock.classList.remove('on'); }
+      else { t0 = Date.now(); clock.classList.add('on'); tick(); timer = setInterval(tick, 250); }
+    }
+    else if (k === 'v' || k === 'V') {
+      showingBackup = !showingBackup; render();
+      const v = document.getElementById('backup');
+      if (showingBackup && v && v.play) { v.currentTime = 0; v.play().catch(() => {}); }
+    }
+  });
+  addEventListener('click', e => { if (e.target.closest('video')) return; go(e.clientX > innerWidth / 3 ? 1 : -1); });
+
+  document.getElementById('backup').addEventListener('error', function () {
+    this.outerHTML = '<div class="missing label">Falta docs/pitch/demo-respaldo.mp4</div>';
+  });
+  const photo = document.querySelector('#photo img');
+  if (photo) photo.addEventListener('error', function () {
+    this.outerHTML = '<span class="label">Falta docs/pitch/andres.jpg · foto de Andrés corriendo</span>';
+  });
+
+  try { if (localStorage.getItem('trazada-tema') === 'oscuro') document.body.classList.add('dark'); } catch (e) {}
+  const h = location.hash.slice(1);
+  if (h === 'v') showingBackup = true; else if (+h >= 1) i = Math.min(main.length, +h) - 1;
+  addEventListener('resize', fit); fit(); render();
+  setTimeout(() => { document.getElementById('help').style.opacity = 0; }, 4000);
+})();
+</script>
+</body>
+</html>
