@@ -33,6 +33,22 @@ export type TacticsState =
   | { kind: 'ready'; result: TacticsResult }
   | { kind: 'error' }
 
+/**
+ * Una sola petición por carrera, aunque la pidan varias partes de la pantalla (el panel de
+ * tácticas y el informe del atleta). Si falla, se olvida para poder reintentar después.
+ */
+const pending = new Map<string, Promise<TacticsResult>>()
+
+function fetchTactics(key: string, body: NonNullable<ReturnType<typeof tacticsRequest>>) {
+  let p = pending.get(key)
+  if (!p) {
+    p = apiPost<TacticsResult>('/tactics/', body)
+    p.catch(() => pending.delete(key))
+    pending.set(key, p)
+  }
+  return p
+}
+
 /** Pide las tácticas de una carrera. Si falla, la pantalla sigue igual: es un extra. */
 export function useTactics(race: Race): TacticsState {
   const body = tacticsRequest(race)
@@ -40,11 +56,13 @@ export function useTactics(race: Race): TacticsState {
 
   useEffect(() => {
     if (!body) return
-    const ctrl = new AbortController()
-    apiPost<TacticsResult>('/tactics/', body, { signal: ctrl.signal })
-      .then((result) => setState({ kind: 'ready', result }))
-      .catch(() => !ctrl.signal.aborted && setState({ kind: 'error' }))
-    return () => ctrl.abort()
+    let alive = true
+    fetchTactics(race.video.url ?? race.title, body)
+      .then((result) => alive && setState({ kind: 'ready', result }))
+      .catch(() => alive && setState({ kind: 'error' }))
+    return () => {
+      alive = false
+    }
     // La carrera no cambia dentro de la pantalla (Home la reemplaza con `key`).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [race.video.url])
