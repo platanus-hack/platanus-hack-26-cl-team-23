@@ -1,13 +1,13 @@
 // Zonas de la pista: en qué tramo (Z1..Z6) enfoca la cámara en cada cuadro.
 //
-// Dos pasos, igual que el seguimiento: evidencia visual por lote
-// (POST /api/zones/features, sin estado) y un filtro final sobre todo el video
-// (POST /api/zones/). Los cuadros son los MISMOS que van al detector: se extraen una vez.
+// Dos pasos, igual que el seguimiento: evidencia visual por lote (sale de
+// POST /api/tracking/analyze, en la misma subida que la detección) y un filtro final
+// sobre todo el video (POST /api/zones/).
 //
 // Esto dice dónde mira la CÁMARA, no dónde está cada corredor: sirve para ubicar el
 // encuadre en la pista, no para medir a los atletas.
 
-import { apiPost, apiUpload } from '../lib/api'
+import { apiPost } from '../lib/api'
 import type { ZonesResult } from './types'
 import type { components } from '../types/api.gen'
 
@@ -23,19 +23,6 @@ export type ZoneOptions = {
 
 /** La apariencia y la curvatura solo hacen falta cada ~0,5 s; el histograma, en todos. */
 const DESC_EVERY_S = 0.5
-
-/** Evidencia visual de un lote de cuadros (mismo lote que va al detector). */
-export function collectZoneFeatures(
-  frames: { index: number; t: number; jpeg: Blob }[],
-  signal?: AbortSignal,
-): Promise<ZoneFeaturesResponse> {
-  const form = new FormData()
-  for (const f of frames) {
-    form.append('frames', f.jpeg, `f${f.index}.jpg`)
-    form.append('t', String(f.t))
-  }
-  return apiUpload<ZoneFeaturesResponse>('/zones/features', form, { signal })
-}
 
 /** Filtro de zonas sobre todas las features acumuladas. */
 export async function resolveZones(

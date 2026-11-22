@@ -81,6 +81,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tracking/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analyze
+         * @description /detect y /zones/features en una sola petición: cada frame viaja una vez, no dos.
+         */
+        post: operations["analyze_api_tracking_analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tracking/track": {
         parameters: {
             query?: never;
@@ -245,6 +265,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AnalyzeResponse
+         * @description /detect y /zones/features sobre el mismo lote, con una sola subida de frames.
+         */
+        AnalyzeResponse: {
+            detect: components["schemas"]["DetectResponse"];
+            /** @description None si no se pidieron zonas o si fallaron: el seguimiento no depende de ellas */
+            zones: components["schemas"]["ZoneFeaturesResponse"] | null;
+        };
         /** AthleteFeaturesResponse */
         AthleteFeaturesResponse: {
             /** Frames */
@@ -391,6 +420,35 @@ export interface components {
             t0: number;
             /** Frames */
             frames: components["schemas"]["AthletesFrame"][];
+        };
+        /** Body_analyze_api_tracking_analyze_post */
+        Body_analyze_api_tracking_analyze_post: {
+            /**
+             * Frames
+             * @description JPEG/PNG, uno por frame
+             */
+            frames: string[];
+            /**
+             * T
+             * @description Segundos de cada frame, mismo orden
+             */
+            t: number[];
+            /**
+             * Orig Width
+             * @description Ancho del video original
+             */
+            orig_width: number;
+            /**
+             * Orig Height
+             * @description Alto del video original
+             */
+            orig_height: number;
+            /**
+             * With Zones
+             * @description También evidencia de zonas
+             * @default true
+             */
+            with_zones: boolean;
         };
         /** Body_detect_api_tracking_detect_post */
         Body_detect_api_tracking_detect_post: {
@@ -1043,6 +1101,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetectResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_api_tracking_analyze_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_analyze_api_tracking_analyze_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyzeResponse"];
                 };
             };
             /** @description Validation Error */

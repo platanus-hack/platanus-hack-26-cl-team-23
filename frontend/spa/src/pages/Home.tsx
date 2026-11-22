@@ -3,7 +3,7 @@ import { BarcodeScrubber } from '../components/trazada/BarcodeScrubber'
 import { CameraView } from '../components/trazada/CameraView'
 import { NarrationPanel } from '../components/trazada/NarrationPanel'
 import { RunnerList, RunnerStats } from '../components/trazada/RunnerList'
-import { TopView } from '../components/trazada/TopView'
+import { TopViewZoom } from '../components/trazada/TopViewZoom'
 import { UploadPanel } from '../components/trazada/UploadPanel'
 import { Button, Figure, PageTitle, Pending } from '../components/trazada/ui'
 import { NavActions } from '../navActions'
@@ -57,6 +57,8 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
   const seenNow = (frame?.athletes ?? []).filter((a) => a.visible)
   const meanV = seenNow.reduce((sum, a) => sum + a.v, 0) / Math.max(1, seenNow.length)
   const spread = seenNow.length ? Math.max(...seenNow.map((a) => a.x)) - Math.min(...seenNow.map((a) => a.x)) : 0
+
+  const mapTitle = race.hasAthletes ? 'Dónde está cada atleta' : 'Dónde mira la cámara'
 
   const facts = [
     race.title,
@@ -120,12 +122,8 @@ function RaceScreen({ race, onNewUpload }: { race: Race; onNewUpload: () => void
 
       <div className="grid gap-[var(--section-gap)] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         {race.camera && (
-          <Figure
-            title={race.hasAthletes ? 'Dónde está cada atleta' : 'Dónde mira la cámara'}
-            flush
-            meta="Pista de 400 m · carriles ensanchados"
-          >
-            <TopView race={race} frameIndex={fi} selectedId={selectedId} />
+          <Figure title={mapTitle} flush meta="Pista de 400 m · carriles ensanchados">
+            <TopViewZoom race={race} frameIndex={fi} selectedId={selectedId} title={mapTitle} />
             <dl className="grid grid-cols-3 gap-2 px-6 pt-2 pb-6">
               {race.hasAthletes ? (
                 <>

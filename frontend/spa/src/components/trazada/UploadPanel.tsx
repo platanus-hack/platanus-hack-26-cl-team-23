@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { buildRace } from '../../trazada/adapter'
+import { buildRace, frameAt } from '../../trazada/adapter'
 import { fmtNum } from '../../trazada/format'
 import type { Race } from '../../trazada/types'
 import {
@@ -11,8 +11,10 @@ import {
   type Progress,
 } from '../../trazada/upload'
 import { DEFAULT_ATHLETE_OPTIONS } from '../../trazada/athletes'
+import { usePlayback } from '../../trazada/usePlayback'
 import { DEFAULT_DISTANCE, PRUEBAS, describeStart } from '../../trazada/pruebas'
 import { ApiError } from '../../lib/api'
+import { CameraView } from './CameraView'
 import { Button, Figure, TrackMark } from './ui'
 
 type State =
@@ -55,6 +57,8 @@ export function UploadPanel({ onReady }: Props) {
   const [link, setLink] = useState('')
   const [distance, setDistance] = useState(DEFAULT_DISTANCE)
   const [shot, setShot] = useState('0')
+  // Seguimiento de los primeros lotes ya detectados: es lo que se ve mientras el resto se procesa.
+  const [preview, setPreview] = useState<Race | null>(null)
   const input = useRef<HTMLInputElement>(null)
   const abort = useRef<AbortController | null>(null)
 
@@ -65,6 +69,7 @@ export function UploadPanel({ onReady }: Props) {
     const ctrl = new AbortController()
     abort.current = ctrl
     setState({ kind: 'checking' })
+    setPreview(null)
     try {
       const info = await probeVideo(src)
       if (info.duration > MAX_SECONDS + 0.5) {
@@ -82,6 +87,7 @@ export function UploadPanel({ onReady }: Props) {
         (progress) => setState({ kind: 'processing', name, src, progress }),
         {
           signal: ctrl.signal,
+          onPartial: (partial) => setPreview(buildRace(partial, undefined, undefined, { title: name, videoUrl: src })),
           zones: { distance, t0: gun },
           athletes: { ...DEFAULT_ATHLETE_OPTIONS, t0: gun, distance },
         },
@@ -137,9 +143,12 @@ export function UploadPanel({ onReady }: Props) {
     return (
       <Figure title="Reconstruyendo la carrera" meta={`${Math.round(pct * 100)} %`}>
         <div className="flex flex-col gap-6 md:flex-row md:items-start">
-          {state.kind === 'processing' && (
-            <video src={state.src} muted playsInline className="aspect-video w-full rounded-inner bg-fg object-cover md:w-80" />
-          )}
+          {state.kind === 'processing' &&
+            (preview ? (
+              <LivePreview race={preview} />
+            ) : (
+              <video src={state.src} muted playsInline className="aspect-video w-full rounded-inner bg-fg object-cover md:w-80" />
+            ))}
           <div className="min-w-0 flex-1">
             <p className="text-2xl leading-tight font-semibold tracking-[-0.01em]" aria-live="polite">
               {state.kind === 'checking' ? 'Revisando el video…' : `${capitalize(PHASE_LABEL[state.progress.phase])}…`}
@@ -269,6 +278,27 @@ export function UploadPanel({ onReady }: Props) {
         </p>
       )}
     </Figure>
+  )
+}
+
+/**
+ * El video con los corredores ya detectados, en bucle sobre lo que va listo. El reloj corre
+ * solo hasta donde llegó el seguimiento, así que las cajas nunca se quedan congeladas.
+ */
+function LivePreview({ race }: { race: Race }) {
+  const { t, playing } = usePlayback(race.video.duration)
+  return (
+    <div className="w-full overflow-hidden rounded-inner md:w-[26rem]">
+      <CameraView
+        race={race}
+        frameIndex={frameAt(race.frames, t)}
+        t={t}
+        playing={playing}
+        showOverlay
+        selectedId={undefined}
+        onSelect={() => {}}
+      />
+    </div>
   )
 }
 
