@@ -13,12 +13,14 @@ export function Figure({
   flush = false,
   children,
   className = '',
+  bodyClassName = '',
 }: {
   title: string
   meta?: ReactNode
   flush?: boolean
   children: ReactNode
   className?: string
+  bodyClassName?: string
 }) {
   return (
     <section className={`fig ${className}`}>
@@ -26,7 +28,7 @@ export function Figure({
         <h2 className="title">{title}</h2>
         {meta && <span className="label ml-auto text-muted">{meta}</span>}
       </header>
-      <div className={flush ? 'fig-body--flush' : 'fig-body'}>{children}</div>
+      <div className={`${flush ? 'fig-body--flush' : 'fig-body'} ${bodyClassName}`}>{children}</div>
     </section>
   )
 }

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { fmtClock, fmtNum, fmtPct } from '../../trazada/format'
 import { remainingSegments, stepAt, useTactics } from '../../trazada/tactics'
 import type { Attack, ForecastAthlete, Race, TacticsStep } from '../../trazada/types'
@@ -45,7 +45,11 @@ export function TacticsPanel({ race, t, selectedId, onSelect }: Props) {
   return (
     <div className="grid items-start gap-[var(--section-gap)] lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
       <Forecast steps={steps} step={step} t={t} selectedId={selectedId} onSelect={onSelect} note={disclaimer} />
-      <Overtakes race={race} step={step} selectedId={selectedId} onSelect={onSelect} />
+      {/* En pantalla ancha esta columna no decide el alto de la fila (lo decide el pronóstico):
+          las tarjetas aparecen y desaparecen con el video, y así la página no salta. */}
+      <div className="lg:relative lg:self-stretch">
+        <Overtakes race={race} step={step} selectedId={selectedId} onSelect={onSelect} />
+      </div>
     </div>
   )
 }
@@ -91,11 +95,11 @@ function Forecast({
       )}
 
       <div className="mt-6">
-        <div className="label grid grid-cols-[1.25rem_3rem_minmax(0,1fr)_3.25rem_minmax(0,8rem)_3.75rem] items-end gap-x-3 px-2 pb-2 text-muted max-sm:grid-cols-[1.25rem_3rem_minmax(0,1fr)_3.25rem_3.75rem]">
+        <div className="label grid grid-cols-[1.25rem_3rem_minmax(0,1fr)_5rem_minmax(0,8rem)_3.75rem] items-end gap-x-3 px-2 pb-2 text-muted max-sm:grid-cols-[1.25rem_3rem_minmax(0,1fr)_5rem_3.75rem]">
           <span />
           <span>Atleta</span>
-          <span>Gana · podio</span>
-          <span className="text-right">%</span>
+          <span className="truncate max-sm:invisible">Opción de ganar · de podio</span>
+          <span />
           <span className="max-sm:hidden">Llegada (10–90 %)</span>
           <span className="text-right">Mediana</span>
         </div>
@@ -108,6 +112,7 @@ function Forecast({
               selected={a.id === selectedId}
               onSelect={onSelect}
               axis={[lo, hi]}
+              labeled={i === 0}
             />
           ))}
         </ol>
@@ -132,12 +137,15 @@ function ForecastRow({
   selected,
   onSelect,
   axis,
+  labeled,
 }: {
   a: ForecastAthlete
   place: number
   selected: boolean
   onSelect: (id: number) => void
   axis: [number, number]
+  /** La primera fila dice qué es cada número; las demás lo heredan por posición. */
+  labeled: boolean
 }) {
   const span = Math.max(1e-6, axis[1] - axis[0])
   const left = ((a.eta[0] - axis[0]) / span) * 100
@@ -149,7 +157,7 @@ function ForecastRow({
         type="button"
         onClick={() => onSelect(a.id)}
         aria-pressed={selected}
-        className={`grid min-h-12 w-full grid-cols-[1.25rem_3rem_minmax(0,1fr)_3.25rem_minmax(0,8rem)_3.75rem] items-center gap-x-3 rounded-inner px-2 text-left transition-colors max-sm:grid-cols-[1.25rem_3rem_minmax(0,1fr)_3.25rem_3.75rem] ${
+        className={`grid min-h-12 w-full grid-cols-[1.25rem_3rem_minmax(0,1fr)_5rem_minmax(0,8rem)_3.75rem] items-center gap-x-3 rounded-inner px-2 text-left transition-colors max-sm:grid-cols-[1.25rem_3rem_minmax(0,1fr)_5rem_3.75rem] ${
           selected ? 'bg-band' : 'hover:bg-paper2'
         } focus-visible:outline-2 focus-visible:-outline-offset-2`}
       >
@@ -168,9 +176,17 @@ function ForecastRow({
             <span className={`block h-full rounded-full bg-other ${ease}`} style={{ width: `${a.p_podium * 100}%` }} />
           </span>
         </span>
-        <span className="text-right leading-tight">
-          <span className={`block text-sm font-semibold ${selected ? 'text-hero' : ''}`}>{fmtPct(a.p_win)}</span>
-          <span className="block text-xs text-muted">{fmtPct(a.p_podium)}</span>
+        <span className="grid grid-cols-[auto_1fr] items-baseline gap-x-1.5 leading-tight">
+          <span className="label text-muted" aria-hidden="true">{labeled ? 'gana' : ''}</span>
+          <span className={`text-right text-sm font-semibold tabular-nums ${selected ? 'text-hero' : ''}`}>
+            <span className="sr-only">gana </span>
+            {fmtPct(a.p_win)}
+          </span>
+          <span className="label text-muted" aria-hidden="true">{labeled ? 'podio' : ''}</span>
+          <span className="text-right text-xs text-muted tabular-nums">
+            <span className="sr-only">podio </span>
+            {fmtPct(a.p_podium)}
+          </span>
         </span>
 
         <span className="relative h-1.5 rounded-full bg-line max-sm:hidden" aria-hidden="true">
@@ -278,7 +294,12 @@ function Overtakes({
   onSelect: (id: number) => void
 }) {
   return (
-    <Figure title="¿Cuándo adelantar?" meta="Mejores oportunidades ahora">
+    <Figure
+      title="¿Cuándo adelantar?"
+      meta="Mejores oportunidades ahora"
+      className="lg:absolute lg:inset-0 lg:flex lg:flex-col"
+      bodyClassName="lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+    >
       {step.attacks.length === 0 ? (
         <Pending>En este momento no hay dos atletas medidos a menos de 15 m uno del otro.</Pending>
       ) : (
@@ -342,27 +363,34 @@ function AttackCard({
         </span>
       </div>
 
-      <div className="mt-3 flex items-end gap-4">
-        <p className="lead-number">{fmtPct(a.p_attack)}</p>
-        <p className="pb-1 text-sm leading-snug text-muted">{detail}</p>
+      <div className="mt-3 flex items-end gap-x-4 gap-y-1 max-sm:flex-wrap">
+        <p className="lead-number shrink-0">{fmtPct(a.p_attack)}</p>
+        <p className="min-w-0 flex-1 pb-1 text-sm leading-snug text-pretty text-muted">{detail}</p>
       </div>
 
       <AttackMap a={a} selected={selected} />
 
       <dl className="mt-3 grid grid-cols-3 gap-2">
-        <Mini term="Reserva" value={`${fmtPct(a.reserve)} · ${fmtPct(a.rival_reserve)}`} />
-        <Mini term="A rebufo" value={`${fmtNum(a.draft_m, 0)} m`} />
-        <Mini term="Costo de pasar" value={a.extra_m > 0 ? `+${fmtNum(a.extra_m, 1)} m` : 'sin costo'} />
+        <Mini term="Energía">
+          <span className="block">
+            <span className="label font-normal text-muted">#{a.id}</span> {fmtPct(a.reserve)}
+          </span>
+          <span className="block">
+            <span className="label font-normal text-muted">#{a.rival}</span> {fmtPct(a.rival_reserve)}
+          </span>
+        </Mini>
+        <Mini term={`#${a.id} a rebufo`}>{fmtNum(a.draft_m, 0)} m</Mini>
+        <Mini term="Pasar por fuera">{a.extra_m > 0 ? `+${fmtNum(a.extra_m, 1)} m` : 'sin costo'}</Mini>
       </dl>
     </div>
   )
 }
 
-function Mini({ term, value }: { term: string; value: string }) {
+function Mini({ term, children }: { term: string; children: ReactNode }) {
   return (
-    <div className="rounded-inner bg-surface px-3 py-2">
+    <div className="min-w-0 rounded-inner bg-surface px-3 py-2">
       <dt className="label text-muted">{term}</dt>
-      <dd className="mt-0.5 text-sm font-semibold whitespace-nowrap">{value}</dd>
+      <dd className="mt-0.5 text-sm font-semibold whitespace-nowrap tabular-nums">{children}</dd>
     </div>
   )
 }
