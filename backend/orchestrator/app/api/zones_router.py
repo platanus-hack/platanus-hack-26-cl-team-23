@@ -16,10 +16,14 @@ async def features(
     service: ServiceDep,
     frames: Annotated[list[UploadFile], File(description="JPEG/PNG, uno por frame")],
     t: Annotated[list[float], Form(description="Segundos de cada frame, mismo orden")],
+    want_desc: Annotated[
+        list[bool] | None,
+        Form(description="Por frame: ¿calcular apariencia y curvatura? Sin él, todos"),
+    ] = None,
 ) -> ZoneFeaturesResponse:
     """Evidencia visual por frame (histograma de corte, apariencia, curvatura de líneas)."""
     images = [await frame.read() for frame in frames]
-    return await service.features(images, t)
+    return await service.features(images, t, want_desc)
 
 
 @router.post("/", response_model=ZonesResult)

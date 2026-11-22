@@ -46,7 +46,11 @@ class ZoneOutput:
     cuts: list[float] = field(default_factory=list)
 
 
-def frame_features(frame: np.ndarray) -> dict:
+def frame_features(frame: np.ndarray, full: bool = True) -> dict:
+    """`full=False` solo da el histograma de cortes (barato); apariencia y curvatura, que son
+    lo caro, hacen falta solo en los frames que `run` usa como muestra."""
+    if not full:
+        return {"hist": shot_hist(frame), "desc": None, "bend": None, "chord": None, "n": None}
     curv = line_curvature(frame)
     return {
         "hist": shot_hist(frame),

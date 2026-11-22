@@ -11,10 +11,16 @@ Desc = Annotated[list[float], Field(min_length=DESC_SIZE, max_length=DESC_SIZE)]
 class ZoneFeatures(BaseModel):
     t: float
     hist: Hist = Field(description="Histograma de color para detectar cortes de plano")
-    desc: Desc = Field(description="Descriptor de apariencia (memoria de cámaras)")
-    bend: float = Field(description="Flecha/cuerda de las líneas pintadas (curvatura)")
-    chord: float = Field(description="Largo total de líneas medidas (px en 1280x720)")
-    n: int = Field(description="Trazos de línea usados")
+    desc: Desc | None = Field(
+        default=None, description="Descriptor de apariencia (memoria de cámaras)"
+    )
+    bend: float | None = Field(
+        default=None, description="Flecha/cuerda de las líneas pintadas (curvatura)"
+    )
+    chord: float | None = Field(
+        default=None, description="Largo total de líneas medidas (px en 1280x720)"
+    )
+    n: int | None = Field(default=None, description="Trazos de línea usados")
 
 
 class ZoneFeaturesResponse(BaseModel):

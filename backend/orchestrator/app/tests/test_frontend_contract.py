@@ -153,6 +153,37 @@ def test_analyze_equals_detect_plus_zone_features(client: TestClient) -> None:
     assert body["zones"] == separate_zones.json()
 
 
+def test_want_desc_skips_appearance_but_keeps_values_where_asked(client: TestClient) -> None:
+    """Los cuadros sin bandera solo traen `hist`; los marcados traen lo mismo que sin bandera."""
+    batch = _batch(0, 10)
+    full = client.post("/api/zones/features", files=batch["files"], data={"t": batch["data"]["t"]})
+    flags = [i % 5 == 0 for i in range(10)]
+    partial = client.post(
+        "/api/zones/features",
+        files=batch["files"],
+        data={"t": batch["data"]["t"], "want_desc": flags},
+    )
+
+    assert full.status_code == 200, full.text
+    assert partial.status_code == 200, partial.text
+    for i, (a, b) in enumerate(zip(full.json()["frames"], partial.json()["frames"], strict=True)):
+        assert b["hist"] == a["hist"]
+        if flags[i]:
+            assert b == a
+        else:
+            assert (b["desc"], b["bend"], b["chord"], b["n"]) == (None, None, None, None)
+
+
+def test_want_desc_must_match_frame_count(client: TestClient) -> None:
+    batch = _batch(0, 3)
+    response = client.post(
+        "/api/zones/features",
+        files=batch["files"],
+        data={"t": batch["data"]["t"], "want_desc": [True]},
+    )
+    assert response.status_code == 422, response.text
+
+
 def test_analyze_without_zones_skips_them(client: TestClient) -> None:
     batch = _batch(0, 3)
     batch["data"]["with_zones"] = False
@@ -170,7 +201,12 @@ def test_analyze_keeps_tracking_when_zones_fail(
 ) -> None:
     from app.services.zones_service import ZonesService
 
-    async def boom(self: ZonesService, images: list[bytes], times: list[float]) -> None:
+    async def boom(
+        self: ZonesService,
+        images: list[bytes],
+        times: list[float],
+        want_desc: list[bool] | None = None,
+    ) -> None:
         raise RuntimeError("sin evidencia")
 
     monkeypatch.setattr(ZonesService, "features", boom)

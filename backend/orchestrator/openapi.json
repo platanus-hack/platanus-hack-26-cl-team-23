@@ -947,6 +947,21 @@
             "title": "With Zones",
             "description": "Tambi\u00e9n evidencia de zonas",
             "default": true
+          },
+          "want_desc": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "boolean"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Want Desc",
+            "description": "Por frame: \u00bfcalcular apariencia y curvatura de zonas? Sin \u00e9l, todos"
           }
         },
         "type": "object",
@@ -1074,6 +1089,21 @@
             "type": "array",
             "title": "T",
             "description": "Segundos de cada frame, mismo orden"
+          },
+          "want_desc": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "boolean"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Want Desc",
+            "description": "Por frame: \u00bfcalcular apariencia y curvatura? Sin \u00e9l, todos"
           }
         },
         "type": "object",
@@ -1897,27 +1927,55 @@
             "description": "Histograma de color para detectar cortes de plano"
           },
           "desc": {
-            "items": {
-              "type": "number"
-            },
-            "type": "array",
-            "maxItems": 420,
-            "minItems": 420,
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array",
+                "maxItems": 420,
+                "minItems": 420
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Desc",
             "description": "Descriptor de apariencia (memoria de c\u00e1maras)"
           },
           "bend": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Bend",
             "description": "Flecha/cuerda de las l\u00edneas pintadas (curvatura)"
           },
           "chord": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Chord",
             "description": "Largo total de l\u00edneas medidas (px en 1280x720)"
           },
           "n": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "N",
             "description": "Trazos de l\u00ednea usados"
           }
@@ -1925,11 +1983,7 @@
         "type": "object",
         "required": [
           "t",
-          "hist",
-          "desc",
-          "bend",
-          "chord",
-          "n"
+          "hist"
         ],
         "title": "ZoneFeatures"
       },
